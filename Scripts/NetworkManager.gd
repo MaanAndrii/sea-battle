@@ -87,12 +87,20 @@ func _serialize_fleet(ships: Array) -> Array:
 	var result := []
 	for i in range(ships.size()):
 		var ship = ships[i]
-		if not ship.is_placed: continue
+		# Check if ship is sunk (not placed but all sections hit)
+		var ds = ship.get("damaged_sections")
+		var is_sunk = false
+		if not ship.is_placed and ds is Array and ds.size() > 0:
+			is_sunk = true
+			for d in ds:
+				if not d: is_sunk = false; break
+		if not ship.is_placed and not is_sunk: continue
 		result.append({
-			"fleet_idx":     i,          # стабільний індекс — унікальний навіть для однойменних кораблів
+			"fleet_idx":     i,
 			"name":          ship.ship_name,
 			"size":          ship.size,
 			"rotation_step": ship.rotation_step,
 			"cells":         ship.cells.map(func(c): return [c.x, c.y]),
+			"sunk":          is_sunk,
 		})
 	return result

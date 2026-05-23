@@ -33,6 +33,7 @@ var _status_lbl:  Label       = null
 var _info_lbl:    Label       = null   # ліміти вибраного корабля
 var _commit_btn:  Button      = null
 var _undo_btn:    Button      = null
+var _fleet_panel: Control     = null
 
 const C_COMMIT = Color(0.2, 0.9, 0.4, 1.0)
 const C_UNDO   = Color(0.6, 0.6, 0.6, 0.9)
@@ -62,6 +63,9 @@ func _init_plan() -> void:
 	for ship in all_ships:
 		if ship.is_placed:
 			plan.append({ "ship": ship, "shots": [] as Array[Vector2i] })
+	if _fleet_panel:
+		_fleet_panel.set("plan_ref", plan)
+		_fleet_panel.queue_redraw()
 
 func _build_ui() -> void:
 	var vp = get_viewport().get_visible_rect().size
@@ -107,6 +111,20 @@ func _build_ui() -> void:
 	_commit_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_commit_btn.pressed.connect(_on_execute_turn)
 	_ui_layer.add_child(_commit_btn)
+
+	# Панель флоту — ліворуч від нижнього поля
+	var lg_x = lower_grid.global_position.x
+	var lg_y = lower_grid.global_position.y
+	var lg_h = lower_grid.cell_size * 20.0
+	var fp_w = lg_x - 8.0
+	if fp_w >= 40.0:
+		_fleet_panel = Control.new()
+		_fleet_panel.set_script(load("res://Scripts/FleetPanel.gd"))
+		_fleet_panel.position = Vector2(4.0, lg_y)
+		_fleet_panel.size     = Vector2(fp_w, lg_h)
+		_fleet_panel.set("all_ships", all_ships)
+		_fleet_panel.set("plan_ref",  plan)
+		_ui_layer.add_child(_fleet_panel)
 
 # ─────────────────────────────────────────
 #  Input з GameScene
@@ -335,6 +353,9 @@ func _refresh_status() -> void:
 				selected_ship.ship_name, turn_manager.energy])
 	else:
 		_set_status("Тапніть корабель для руху/пострілу  |  ⚡ %d" % turn_manager.energy)
+	if _fleet_panel:
+		_fleet_panel.set("selected_ship", selected_ship)
+		_fleet_panel.queue_redraw()
 
 func _refresh_info() -> void:
 	if not selected_ship:
