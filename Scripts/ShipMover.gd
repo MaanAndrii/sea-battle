@@ -237,6 +237,9 @@ func _on_arrow(dir_idx: int) -> void:
 	selected_ship.global_position = grid_renderer.grid_to_world(top_left) \
 		- Vector2(cs / 2.0, cs / 2.0)
 
+	# Оновлюємо рендер поля — стираємо стару позицію, малюємо нову
+	_refresh_grid()
+
 	# planned_path зберігаємо тільки для рендеру лінії маршруту
 	planned_path.append(dir)
 
@@ -287,8 +290,14 @@ func _on_rotate(clockwise: bool) -> void:
 	selected_ship.cells = rot_typed
 
 	# Ніс залишається на місці — оновлюємо global_position
-	var rot_world = grid_renderer.grid_to_world(rot_nose) 		- Vector2(selected_ship.cell_size / 2.0, selected_ship.cell_size / 2.0)
-	selected_ship.global_position = rot_world
+	var rot_cs = selected_ship.cell_size
+	var rot_top_left: Vector2i
+	match selected_ship.rotation_step:
+		0: rot_top_left = Vector2i(rot_nose.x - selected_ship.size + 1, rot_nose.y)
+		1: rot_top_left = Vector2i(rot_nose.x, rot_nose.y - selected_ship.size + 1)
+		_: rot_top_left = rot_nose
+	selected_ship.global_position = grid_renderer.grid_to_world(rot_top_left) \
+		- Vector2(rot_cs / 2.0, rot_cs / 2.0)
 
 	energy_spent += cost
 
@@ -325,9 +334,15 @@ func _on_commit() -> void:
 		for c in raw2: typed2.append(Vector2i(c.x, c.y))
 		selected_ship.cells = typed2
 
-	# Цільова позиція у пікселях
-	var target_px = grid_renderer.grid_to_world(final_nose) \
-		- Vector2(selected_ship.cell_size / 2.0, selected_ship.cell_size / 2.0)
+	# Цільова позиція у пікселях — рахуємо від ліво-верхньої клітинки, не від носа
+	var commit_cs = selected_ship.cell_size
+	var commit_top_left: Vector2i
+	match selected_ship.rotation_step:
+		0: commit_top_left = Vector2i(final_nose.x - selected_ship.size + 1, final_nose.y)
+		1: commit_top_left = Vector2i(final_nose.x, final_nose.y - selected_ship.size + 1)
+		_: commit_top_left = final_nose
+	var target_px = grid_renderer.grid_to_world(commit_top_left) \
+		- Vector2(commit_cs / 2.0, commit_cs / 2.0)
 
 	# Переміщуємо одразу (без анімації для надійності)
 	selected_ship.global_position = target_px
