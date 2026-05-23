@@ -21,8 +21,9 @@ var enemy_setup:  Node   = null
 var plan: Array = []
 
 # ── Поточний стан ─────────────────────────
-var selected_ship:  Node2D = null
-var shots_left:     int    = 0   # пострілів залишилось для вибраного корабля
+var selected_ship:      Node2D = null
+var shots_left:         int    = 0
+var last_fired_noses:   Array[Vector2i] = []   # координати носів що стріляли цього ходу
 
 # ── UI ────────────────────────────────────
 var _ui_layer:    CanvasLayer = null
@@ -220,14 +221,17 @@ func _on_execute_turn() -> void:
 	# 1. Старіємо маркери з минулого ходу
 	_age_markers()
 
-	# 2. Постріли — корабель передаємо для позначення носа
+	# 2. Постріли; збираємо носи кораблів що стріляли (для передачі суперникові)
+	last_fired_noses.clear()
 	for entry in plan:
 		var firing_ship := entry["ship"] as Node2D
 		var shots := entry["shots"] as Array
+		if shots.size() > 0 and firing_ship.is_placed and not firing_ship.cells.is_empty():
+			last_fired_noses.append(Vector2i(firing_ship.cells[0].x, firing_ship.cells[0].y))
 		for coord in shots:
 			var c := coord as Vector2i
 			await get_tree().create_timer(0.15).timeout
-			await _resolve_shot(c, firing_ship)
+			await _resolve_shot(c)
 			emit_signal("shot_fired", c)
 
 	# 3. Очищаємо промахи цього ходу (зникають одразу після виконання)
@@ -245,7 +249,7 @@ func _on_execute_turn() -> void:
 	_refresh_status()
 	emit_signal("turn_executed")
 
-func _resolve_shot(coord: Vector2i, firing_ship: Node2D = null):
+func _resolve_shot(coord: Vector2i):
 	var is_hit = false
 	if enemy_setup:
 		is_hit = enemy_setup.call("is_hit", coord)
@@ -254,13 +258,6 @@ func _resolve_shot(coord: Vector2i, firing_ship: Node2D = null):
 	else:
 		is_hit = upper_grid.cell_state[coord.y][coord.x] == 1
 	upper_grid.set_cell(coord, 6 if is_hit else 5)
-
-	# Засвічуємо ніс корабля що стріляв на прицільній карті суперника (upper_grid)
-	if firing_ship and firing_ship.is_placed and not firing_ship.cells.is_empty():
-		var nose := Vector2i(firing_ship.cells[0].x, firing_ship.cells[0].y)
-		if upper_grid.cell_state[nose.y][nose.x] == 0:
-			upper_grid.set_cell(nose, 9)
-
 	await get_tree().create_timer(0.1).timeout
 
 # ── Управління маркерами ──────────────────────────────────────

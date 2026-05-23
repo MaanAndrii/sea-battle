@@ -287,7 +287,8 @@ func _on_turn_executed() -> void:
 		# ── Мережевий режим ──────────────────────────────────────
 		# Надсилаємо хід: постріли + поточні позиції всіх кораблів
 		var cm_ships: Array = combat_manager.get("all_ships")
-		network_manager.send_turn(_pending_shots, cm_ships)
+		var cm_noses: Array[Vector2i] = combat_manager.get("last_fired_noses")
+		network_manager.send_turn(_pending_shots, cm_ships, cm_noses)
 		_pending_shots.clear()
 		_my_turn = false
 		lower_label.text = "МОЄ ПОЛЕ  [Хід суперника...]"
