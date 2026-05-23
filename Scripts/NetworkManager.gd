@@ -85,9 +85,11 @@ func get_opponent_fleet() -> Array:
 
 func _serialize_fleet(ships: Array) -> Array:
 	var result := []
-	for ship in ships:
+	for i in range(ships.size()):
+		var ship = ships[i]
 		if not ship.is_placed: continue
 		result.append({
+			"fleet_idx":     i,          # стабільний індекс — унікальний навіть для однойменних кораблів
 			"name":          ship.ship_name,
 			"size":          ship.size,
 			"rotation_step": ship.rotation_step,

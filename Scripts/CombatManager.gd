@@ -302,11 +302,14 @@ func _age_markers() -> void:
 				8: upper_grid.set_cell(Vector2i(x, y), 0)   # старе потьмяніле → зникає
 				6: upper_grid.set_cell(Vector2i(x, y), 8)   # влучання → потьмяніти
 				9: upper_grid.set_cell(Vector2i(x, y), 0)   # ніс минулого ходу → зникає
-	# Нижнє поле (постріли ворога по нас) — очищаємо промахи ворога
+	# Нижнє поле: промахи та маркери влучань ворога старіють
 	for y in range(20):
 		for x in range(20):
-			if lower_grid.cell_state[y][x] == 5:
-				lower_grid.set_cell(Vector2i(x, y), 0)
+			match lower_grid.cell_state[y][x]:
+				5: lower_grid.set_cell(Vector2i(x, y), 0)   # промах → зникає
+				8: lower_grid.set_cell(Vector2i(x, y), 0)   # потьмяніле влучання → зникає
+				6: lower_grid.set_cell(Vector2i(x, y), 8)   # влучання → потьмяніти
+				# Стани 10, 11 (уламки) — ніколи не стираємо
 
 func _clear_misses() -> void:
 	for y in range(20):
