@@ -137,9 +137,12 @@ func _on_connection_failed() -> void:
 
 func _on_opponent_connected() -> void:
 	_set_status("Суперник підключився! Переходимо до гри...")
+	# Невелика затримка щоб повідомлення відобразилось, потім переходимо
+	await get_tree().create_timer(0.5).timeout
+	get_tree().change_scene_to_file("res://GameScene.tscn")
 
 func _on_both_ready(_my_turn: bool) -> void:
-	get_tree().change_scene_to_file("res://GameScene.tscn")
+	pass  # черговість визначається в GameScene після обміну флотами
 
 # ── Утиліти ──────────────────────────────────────────────────
 
