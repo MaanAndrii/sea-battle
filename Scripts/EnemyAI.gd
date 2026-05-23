@@ -68,7 +68,10 @@ func _resolve(coord: Vector2i) -> void:
 		lower_grid.set_cell(coord, 6)
 		_on_hit(coord)
 	else:
-		lower_grid.set_cell(coord, 5)
+		# Не перекриваємо уламки промахом
+		var existing = lower_grid.cell_state[coord.y][coord.x]
+		if existing != 10 and existing != 11:
+			lower_grid.set_cell(coord, 5)
 
 func _on_hit(coord: Vector2i) -> void:
 	for ship in all_ships:
@@ -81,9 +84,10 @@ func _on_hit(coord: Vector2i) -> void:
 				return
 
 func _check_sunk(ship: Node2D) -> void:
+	# Перевіряємо через GridModel (не через cell_state — він змінюється між ходами)
 	for c in ship.cells:
-		if lower_grid.cell_state[c.y][c.x] != 6:
-			return
+		if player_model.grid[c.y][c.x] == 1:
+			return   # ще є живі клітинки
 
 	var ship_cells: Array[Vector2i] = []
 	for c in ship.cells:

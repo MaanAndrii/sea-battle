@@ -23,8 +23,9 @@ var plan: Array = []
 # ── Поточний стан ─────────────────────────
 var selected_ship:      Node2D = null
 var shots_left:         int    = 0
-var last_fired_noses:   Array[Vector2i] = []   # координати носів що стріляли цього ходу
-var _nose_at_shot_time: Dictionary = {}        # ship → nose Vector2i на момент першого пострілу
+var last_fired_noses:   Array[Vector2i] = []
+var _nose_at_shot_time: Dictionary = {}
+var _busy:              bool   = false   # true під час виконання ходу / ходу ворога
 
 # ── UI ────────────────────────────────────
 var _ui_layer:    CanvasLayer = null
@@ -112,6 +113,7 @@ func _build_ui() -> void:
 # ─────────────────────────────────────────
 
 func handle_input(gpos: Vector2) -> void:
+	if _busy: return
 	# Тап на верхнє поле → постріл (якщо є вибраний корабель)
 	var upper_coord = upper_grid.world_to_grid(gpos)
 	if upper_grid.is_valid(upper_coord):
@@ -169,10 +171,14 @@ func _deselect() -> void:
 # ─────────────────────────────────────────
 
 func _add_shot(coord: Vector2i) -> void:
-	# Перевіряємо чи вже стріляли сюди
 	var entry = _get_plan(selected_ship)
 	var shots = entry["shots"] as Array
 	var cv    = Vector2i(coord.x, coord.y)
+	# Блокуємо стрільбу по уламках
+	var cell_st = upper_grid.cell_state[coord.y][coord.x]
+	if cell_st == 10 or cell_st == 11:
+		_set_status("⚠ Ця клітинка зайнята уламками!")
+		return
 	if cv in shots:
 		_set_status("⚠ В цю клітинку вже заплановано постріл")
 		return
@@ -223,6 +229,9 @@ func _on_undo_shot() -> void:
 # ─────────────────────────────────────────
 
 func _on_execute_turn() -> void:
+	if _busy: return
+	_busy = true
+	_commit_btn.disabled = true
 	_deselect()
 	_set_status("⏳ Виконання ходу...")
 
@@ -256,8 +265,19 @@ func _on_execute_turn() -> void:
 	_init_plan()
 	_refresh_status()
 	emit_signal("turn_executed")
+	# Кнопка залишається заблокованою до виклику resume() з GameScene
+
+func resume() -> void:
+	_busy = false
+	_commit_btn.disabled = false
+	_refresh_status()
 
 func _resolve_shot(coord: Vector2i):
+	# Не стріляємо по уламках (захист від переписування стану 10/11)
+	var existing = upper_grid.cell_state[coord.y][coord.x]
+	if existing == 10 or existing == 11:
+		await get_tree().create_timer(0.1).timeout
+		return
 	var is_hit = false
 	if enemy_setup:
 		is_hit = enemy_setup.call("is_hit", coord)

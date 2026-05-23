@@ -296,10 +296,12 @@ func _on_turn_executed() -> void:
 		await network_opponent.opponent_turn_applied
 		_my_turn = true
 		lower_label.text = "МОЄ ПОЛЕ  [Фаза бою]"
+		combat_manager.call("resume")
 	else:
 		# ── Одиночний режим ──────────────────────────────────────
 		if enemy_ai:
 			await enemy_ai.call("execute_turn")
+		combat_manager.call("resume")
 
 func _on_shot_fired(coord: Vector2i) -> void:
 	# Накопичуємо постріли для надсилання мережею в кінці ходу
