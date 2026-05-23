@@ -217,18 +217,25 @@ func _on_execute_turn() -> void:
 	_deselect()
 	_set_status("⏳ Виконання ходу...")
 
-	# Постріли — кораблі вже переміщені ShipMover в реальному часі
+	# 1. Старіємо маркери з минулого ходу
+	_age_markers()
+
+	# 2. Постріли — корабель передаємо для позначення носа
 	for entry in plan:
-		var shots = entry["shots"] as Array
+		var firing_ship := entry["ship"] as Node2D
+		var shots := entry["shots"] as Array
 		for coord in shots:
-			var c = coord as Vector2i
+			var c := coord as Vector2i
 			await get_tree().create_timer(0.15).timeout
-			await _resolve_shot(c)
+			await _resolve_shot(c, firing_ship)
 			emit_signal("shot_fired", c)
 
-	# Скидаємо мітки
+	# 3. Очищаємо промахи цього ходу (зникають одразу після виконання)
+	_clear_misses()
+
+	# 4. Скидаємо мітки кораблів
 	for entry in plan:
-		var s = entry["ship"] as Node2D
+		var s := entry["ship"] as Node2D
 		s.set("shoot_marked", false)
 		s.set("has_moved",    false)
 		s.queue_redraw()
@@ -238,7 +245,7 @@ func _on_execute_turn() -> void:
 	_refresh_status()
 	emit_signal("turn_executed")
 
-func _resolve_shot(coord: Vector2i):
+func _resolve_shot(coord: Vector2i, firing_ship: Node2D = null):
 	var is_hit = false
 	if enemy_setup:
 		is_hit = enemy_setup.call("is_hit", coord)
@@ -247,7 +254,36 @@ func _resolve_shot(coord: Vector2i):
 	else:
 		is_hit = upper_grid.cell_state[coord.y][coord.x] == 1
 	upper_grid.set_cell(coord, 6 if is_hit else 5)
+
+	# Позначаємо ніс корабля що стріляв (тільки на порожній клітинці)
+	if firing_ship and firing_ship.is_placed and not firing_ship.cells.is_empty():
+		var nose := Vector2i(firing_ship.cells[0].x, firing_ship.cells[0].y)
+		if upper_grid.cell_state[nose.y][nose.x] == 0:
+			upper_grid.set_cell(nose, 9)
+
 	await get_tree().create_timer(0.1).timeout
+
+# ── Управління маркерами ──────────────────────────────────────
+
+func _age_markers() -> void:
+	# Верхнє поле (наші постріли по ворогу)
+	for y in range(20):
+		for x in range(20):
+			match upper_grid.cell_state[y][x]:
+				8: upper_grid.set_cell(Vector2i(x, y), 0)   # старе потьмяніле → зникає
+				6: upper_grid.set_cell(Vector2i(x, y), 8)   # влучання → потьмяніти
+				9: upper_grid.set_cell(Vector2i(x, y), 0)   # ніс минулого ходу → зникає
+	# Нижнє поле (постріли ворога по нас) — очищаємо промахи ворога
+	for y in range(20):
+		for x in range(20):
+			if lower_grid.cell_state[y][x] == 5:
+				lower_grid.set_cell(Vector2i(x, y), 0)
+
+func _clear_misses() -> void:
+	for y in range(20):
+		for x in range(20):
+			if upper_grid.cell_state[y][x] == 5:
+				upper_grid.set_cell(Vector2i(x, y), 0)
 
 # ─────────────────────────────────────────
 #  UI оновлення

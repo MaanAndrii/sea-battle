@@ -13,6 +13,11 @@ const FLEET = [
 var upper_grid:  Node2D = null
 var enemy_model          = null   # окремий GridModel для ворога
 
+# Кожен елемент: { all_cells: Array[Vector2i], remaining: Array[Vector2i] }
+# all_cells — всі клітинки корабля (для очищення поля при потопленні)
+# remaining  — ще не уражені клітинки
+var _ships: Array = []
+
 var _ui_layer:  CanvasLayer = null
 var _place_btn: Button      = null
 var _clear_btn: Button      = null
@@ -71,7 +76,11 @@ func _on_place() -> void:
 				var coord = Vector2i(rng.randi_range(0, max_x),
 									 rng.randi_range(0, max_y))
 				if enemy_model.can_place(coord, entry["size"], horiz):
-					enemy_model.place(coord, entry["size"], horiz)
+					var cells = enemy_model.place(coord, entry["size"], horiz)
+					_ships.append({
+						"all_cells": cells.duplicate(),
+						"remaining": cells.duplicate(),
+					})
 					placed = true
 
 	_render_enemy()
@@ -80,13 +89,11 @@ func _on_place() -> void:
 	emit_signal("enemy_placed")
 
 func _on_clear() -> void:
-	# Скидаємо GridModel
 	enemy_model = load("res://Scripts/GridModel.gd").new()
-	# Очищуємо верхнє поле (тільки клітинки з кораблями ворога)
+	_ships.clear()
 	for y in range(20):
 		for x in range(20):
-			var st = upper_grid.cell_state[y][x]
-			if st == 1:   # прибираємо тільки кораблі ворога
+			if upper_grid.cell_state[y][x] == 1:
 				upper_grid.set_cell(Vector2i(x, y), 0)
 	_clear_btn.visible = false
 	_place_btn.text    = "🎲 Розставити ворога"
@@ -102,7 +109,22 @@ func is_hit(coord: Vector2i) -> bool:
 	if not enemy_model: return false
 	return enemy_model.grid[coord.y][coord.x] == 1
 
-## Позначити клітинку як знищену
+## Позначити клітинку як уражену; якщо всі секції знищено — потопити корабель
 func mark_hit(coord: Vector2i) -> void:
-	if enemy_model:
-		enemy_model.grid[coord.y][coord.x] = 0
+	if not enemy_model:
+		return
+	enemy_model.grid[coord.y][coord.x] = 0
+	for ship in _ships:
+		var rem := ship["remaining"] as Array
+		for i in range(rem.size()):
+			if rem[i] == coord:
+				rem.remove_at(i)
+				if rem.is_empty():
+					_sink_ship(ship)
+				return
+
+func _sink_ship(ship: Dictionary) -> void:
+	# Прибираємо всі клітинки потопленого корабля з поля (включно з маркерами влучань)
+	for c in ship["all_cells"]:
+		upper_grid.set_cell(c, 0)
+	_ships.erase(ship)

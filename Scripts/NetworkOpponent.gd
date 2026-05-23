@@ -68,15 +68,29 @@ func _apply_shot(coord: Vector2i) -> void:
 	if player_model.grid[coord.y][coord.x] == 1:
 		player_model.grid[coord.y][coord.x] = 0
 		player_model._rebuild_forbidden()
-		for ship in all_ships:
-			for c in ship.cells:
-				if Vector2i(c.x, c.y) == coord:
-					ship.set("damaged", true)
-					ship.queue_redraw()
-					break
 		lower_grid.set_cell(coord, 6)
+		_on_hit(coord)
 	else:
 		lower_grid.set_cell(coord, 5)
+
+func _on_hit(coord: Vector2i) -> void:
+	for ship in all_ships:
+		if not ship.is_placed: continue
+		for c in ship.cells:
+			if Vector2i(c.x, c.y) == coord:
+				ship.set("damaged", true)
+				ship.queue_redraw()
+				_check_sunk(ship)
+				return
+
+func _check_sunk(ship: Node2D) -> void:
+	for c in ship.cells:
+		if lower_grid.cell_state[c.y][c.x] != 6:
+			return
+	for c in ship.cells:
+		lower_grid.set_cell(Vector2i(c.x, c.y), 0)
+	ship.visible  = false
+	ship.is_placed = false
 
 # ── Заглушка execute_turn (EnemyAI інтерфейс) ────────────────
 

@@ -62,23 +62,31 @@ func _pick_target() -> Vector2i:
 	return Vector2i(-1, -1)
 
 func _resolve(coord: Vector2i) -> void:
-	var is_hit = player_model.grid[coord.y][coord.x] == 1
-
-	if is_hit:
-		# Пошкоджуємо клітинку в GridModel
+	if player_model.grid[coord.y][coord.x] == 1:
 		player_model.grid[coord.y][coord.x] = 0
 		player_model._rebuild_forbidden()
-		# Маркуємо корабель як пошкоджений
-		_mark_ship_damaged(coord)
-		lower_grid.set_cell(coord, 6)  # 💥 червоний
+		lower_grid.set_cell(coord, 6)
+		_on_hit(coord)
 	else:
-		lower_grid.set_cell(coord, 5)  # 🌊 синє коло
+		lower_grid.set_cell(coord, 5)
 
-func _mark_ship_damaged(coord: Vector2i) -> void:
+func _on_hit(coord: Vector2i) -> void:
 	for ship in all_ships:
+		if not ship.is_placed: continue
 		for c in ship.cells:
 			if Vector2i(c.x, c.y) == coord:
 				ship.set("damaged", true)
-				# Помаранчева рамка на пошкодженому кораблі
 				ship.queue_redraw()
+				_check_sunk(ship)
 				return
+
+func _check_sunk(ship: Node2D) -> void:
+	# Корабель потоплено якщо всі його клітинки мають маркер влучання (6)
+	for c in ship.cells:
+		if lower_grid.cell_state[c.y][c.x] != 6:
+			return
+	# Прибираємо маркери і ховаємо корабель
+	for c in ship.cells:
+		lower_grid.set_cell(Vector2i(c.x, c.y), 0)
+	ship.visible  = false
+	ship.is_placed = false
