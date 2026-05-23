@@ -285,7 +285,11 @@ func _resolve_shot(coord: Vector2i):
 			enemy_setup.call("mark_hit", coord)
 	else:
 		is_hit = upper_grid.cell_state[coord.y][coord.x] == 1
-	upper_grid.set_cell(coord, 6 if is_hit else 5)
+	# mark_hit може виставити state 10 (уламки) якщо корабель потоплено —
+	# не перекриваємо його маркером влучання/промаху
+	var post = upper_grid.cell_state[coord.y][coord.x]
+	if post != 10 and post != 11:
+		upper_grid.set_cell(coord, 6 if is_hit else 5)
 	await get_tree().create_timer(0.1).timeout
 
 # ── Управління маркерами ──────────────────────────────────────

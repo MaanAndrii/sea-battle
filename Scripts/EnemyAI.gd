@@ -119,3 +119,4 @@ func _check_sunk(ship: Node2D) -> void:
 
 	ship.modulate  = Color(0.6, 0.6, 0.7, 0.30)
 	ship.is_placed = false
+	ship.queue_redraw()
