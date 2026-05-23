@@ -365,8 +365,13 @@ func _on_commit() -> void:
 func _refresh_grid() -> void:
 	for y in range(20):
 		for x in range(20):
-			var st = grid_model.grid[y][x]
-			grid_renderer.set_cell(Vector2i(x, y), 1 if st == 1 else 0)
+			var gm_val = grid_model.grid[y][x]
+			var cur    = grid_renderer.cell_state[y][x]
+			if gm_val == 1:
+				grid_renderer.set_cell(Vector2i(x, y), 1)   # корабель на місці
+			elif cur == 1:
+				grid_renderer.set_cell(Vector2i(x, y), 0)   # корабель відплив → очищаємо
+			# Всі маркери (5,6,8,10,11…) залишаємо без змін
 
 # ─────────────────────────────────────────
 #  Рендер (лінія маршруту + фантом)
@@ -526,11 +531,15 @@ func apply_planned_move_to_model(ship: Node2D, final_nose: Vector2i) -> void:
 	var typed: Array[Vector2i] = []
 	for c in raw: typed.append(Vector2i(c.x, c.y))
 	ship.cells = typed
-	# Оновлюємо рендер
+	# Оновлюємо рендер (зберігаємо маркери)
 	for y in range(20):
 		for x in range(20):
-			var st = grid_model.grid[y][x]
-			grid_renderer.set_cell(Vector2i(x, y), 1 if st == 1 else 0)
+			var gm_val = grid_model.grid[y][x]
+			var cur    = grid_renderer.cell_state[y][x]
+			if gm_val == 1:
+				grid_renderer.set_cell(Vector2i(x, y), 1)
+			elif cur == 1:
+				grid_renderer.set_cell(Vector2i(x, y), 0)
 
 ## Конвертує ніс корабля в координату для GridModel.place (ліва/верхня клітинка)
 func _nose_to_grid_coord(nose: Vector2i, sz: int, step: int) -> Vector2i:
