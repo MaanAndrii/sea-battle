@@ -27,7 +27,6 @@ func setup(p_lower: Node2D, p_model, p_ships: Array) -> void:
 func execute_turn() -> void:
 	print("[EnemyAI] execute_turn: player_model=", player_model != null)
 	if player_model:
-		# Рахуємо скільки кораблів є
 		var count = 0
 		for y in range(20):
 			for x in range(20):
@@ -49,8 +48,6 @@ func execute_turn() -> void:
 		_resolve(coord)
 
 func _pick_target() -> Vector2i:
-	# Спочатку намагаємось стріляти по невідомих клітинках
-	# Простий алгоритм: випадкова клітинка яку ще не обстрілювали
 	var attempts = 0
 	while attempts < 400:
 		attempts += 1
@@ -68,7 +65,6 @@ func _resolve(coord: Vector2i) -> void:
 		lower_grid.set_cell(coord, 6)
 		_on_hit(coord)
 	else:
-		# Не перекриваємо уламки промахом
 		var existing = lower_grid.cell_state[coord.y][coord.x]
 		if existing != 10 and existing != 11:
 			lower_grid.set_cell(coord, 5)
@@ -76,28 +72,37 @@ func _resolve(coord: Vector2i) -> void:
 func _on_hit(coord: Vector2i) -> void:
 	for ship in all_ships:
 		if not ship.is_placed: continue
-		for c in ship.cells:
-			if Vector2i(c.x, c.y) == coord:
+		for i in range(ship.cells.size()):
+			if Vector2i(ship.cells[i].x, ship.cells[i].y) == coord:
+				# Ініціалізуємо damaged_sections якщо ще не є
+				var ds = ship.get("damaged_sections")
+				if not (ds is Array) or ds.size() != ship.size:
+					ds = []
+					for _j in range(ship.size): ds.append(false)
+				ds[i] = true
+				ship.set("damaged_sections", ds)
 				ship.set("damaged", true)
 				ship.queue_redraw()
 				_check_sunk(ship)
 				return
 
 func _check_sunk(ship: Node2D) -> void:
-	# Перевіряємо через GridModel (не через cell_state — він змінюється між ходами)
-	for c in ship.cells:
-		if player_model.grid[c.y][c.x] == 1:
-			return   # ще є живі клітинки
+	# Перевіряємо за секціями (індексами), а не координатами —
+	# щоб корабель що переміщувався після поранення вважався потопленим коректно
+	var ds = ship.get("damaged_sections")
+	if not (ds is Array) or ds.size() < ship.size:
+		return
+	for d in ds:
+		if not d: return  # є неураженa секція
 
+	# Всі секції уражені → потопити
 	var ship_cells: Array[Vector2i] = []
 	for c in ship.cells:
 		ship_cells.append(Vector2i(c.x, c.y))
 
-	# Клітинки корабля → уламки
 	for cv in ship_cells:
 		lower_grid.set_cell(cv, 10)
 
-	# Сусідні клітинки → зона уламків
 	var adj_cells: Array[Vector2i] = []
 	for cv in ship_cells:
 		for dy in range(-1, 2):
@@ -109,11 +114,9 @@ func _check_sunk(ship: Node2D) -> void:
 						lower_grid.set_cell(nb, 11)
 					adj_cells.append(nb)
 
-	# Блокуємо рух в GridModel
 	if player_model:
 		player_model.add_wreckage(ship_cells)
 		player_model.add_wreckage(adj_cells)
 
-	# Корабель залишається видимим але напівпрозорим
 	ship.modulate  = Color(0.6, 0.6, 0.7, 0.30)
 	ship.is_placed = false

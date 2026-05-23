@@ -13,9 +13,11 @@ var network_manager: Node   = null
 var player_model             = null
 var all_ships:       Array  = []
 
-var _opponent_fleet: Array = []
+# Поточний флот суперника — використовується тільки для is_hit/mark_hit
+# Структура: { ship_name → { "size", "current_cells": [[x,y],...], "hit_sections": Array[bool] } }
+var _opponent_ships: Dictionary = {}
 var _opponent_fleet_ready: bool = false
-var _opponent_turn_ready:  bool = false  # true як тільки перший хід суперника отримано
+var _opponent_turn_ready:  bool = false
 
 func setup(p_upper: Node2D, p_lower: Node2D,
 		p_net: Node, p_model, p_ships: Array) -> void:
@@ -30,40 +32,91 @@ func setup(p_upper: Node2D, p_lower: Node2D,
 # ── Флот ─────────────────────────────────────────────────────
 
 func _on_fleet_received(fleet: Array) -> void:
-	_opponent_fleet = fleet
+	_opponent_ships.clear()
+	for ship_data in fleet:
+		var name_key: String = ship_data.get("name", "")
+		var cells: Array     = ship_data.get("cells", [])
+		var sz: int          = cells.size()
+		var hit_sec: Array   = []
+		for _i in range(sz): hit_sec.append(false)
+		_opponent_ships[name_key] = {
+			"size":          sz,
+			"current_cells": cells.duplicate(true),
+			"hit_sections":  hit_sec,
+		}
 	_opponent_fleet_ready = true
 	enemy_placed.emit()
 
 # ── Інтерфейс CombatManager (is_hit / mark_hit) ──────────────
 
 func is_hit(coord: Vector2i) -> bool:
-	for ship_data in _opponent_fleet:
-		for ca in ship_data["cells"]:
+	for ship_name in _opponent_ships:
+		for ca in _opponent_ships[ship_name]["current_cells"]:
 			if ca[0] == coord.x and ca[1] == coord.y:
 				return true
 	return false
 
 func mark_hit(coord: Vector2i) -> void:
-	for ship_data in _opponent_fleet:
-		var cells := ship_data["cells"] as Array
+	for ship_name in _opponent_ships:
+		var entry   = _opponent_ships[ship_name]
+		var cells   = entry["current_cells"] as Array
+		var hit_sec = entry["hit_sections"]  as Array
 		for i in range(cells.size()):
 			if cells[i][0] == coord.x and cells[i][1] == coord.y:
-				cells.remove_at(i)
+				hit_sec[i] = true
+				# Перевіряємо чи потоплений
+				var all_hit := true
+				for d in hit_sec:
+					if not d: all_hit = false; break
+				if all_hit:
+					_sink_opponent_ship(entry)
 				return
+
+func _sink_opponent_ship(entry: Dictionary) -> void:
+	var cells    = entry["current_cells"] as Array
+	var ship_cvs: Array[Vector2i] = []
+	for ca in cells:
+		ship_cvs.append(Vector2i(ca[0], ca[1]))
+
+	# Позначаємо на верхньому полі (прицільна карта) — стан 10 (уламки)
+	for cv in ship_cvs:
+		upper_grid.set_cell(cv, 10)
+
+	# Суміжні клітинки — стан 11 (заблокована зона)
+	var adj: Array[Vector2i] = []
+	for cv in ship_cvs:
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				if dx == 0 and dy == 0: continue
+				var nb = Vector2i(cv.x + dx, cv.y + dy)
+				if upper_grid.is_valid(nb) and not ship_cvs.has(nb) and not adj.has(nb):
+					if upper_grid.cell_state[nb.y][nb.x] != 10:
+						upper_grid.set_cell(nb, 11)
+					adj.append(nb)
 
 # ── Хід суперника ─────────────────────────────────────────────
 
 func _on_turn_received(turn: Dictionary) -> void:
-	# Оновлюємо позиції флоту суперника
+	# Оновлюємо поточні позиції кораблів суперника
 	var moves := turn.get("moves", []) as Array
-	if moves.size() > 0:
-		_opponent_fleet = moves
+	for ship_data in moves:
+		var name_key: String = ship_data.get("name", "")
+		if _opponent_ships.has(name_key):
+			# Оновлюємо поточні клітинки; hit_sections залишаються незмінними
+			var new_cells: Array = ship_data.get("cells", [])
+			_opponent_ships[name_key]["current_cells"] = new_cells.duplicate(true)
+			# Розмір міг не змінитися, але на всяк випадок синхронізуємо
+			var sz: int      = new_cells.size()
+			var hit_sec: Array = _opponent_ships[name_key]["hit_sections"]
+			if hit_sec.size() != sz:
+				# Якщо розмір змінився (не повинно, але захист) — розширюємо
+				while hit_sec.size() < sz: hit_sec.append(false)
 
 	# Застосовуємо постріли суперника по нашому флоту
 	for shot_arr in (turn.get("shots", []) as Array):
 		_apply_shot(Vector2i(shot_arr[0], shot_arr[1]))
 
-	# ⚡ Показуємо носи кораблів суперника що стріляли — на нашій прицільній карті
+	# Показуємо носи кораблів суперника на нашій прицільній карті
 	for nose_arr in (turn.get("noses", []) as Array):
 		var nose := Vector2i(nose_arr[0], nose_arr[1])
 		if upper_grid.cell_state[nose.y][nose.x] == 0:
@@ -86,17 +139,25 @@ func _apply_shot(coord: Vector2i) -> void:
 func _on_hit(coord: Vector2i) -> void:
 	for ship in all_ships:
 		if not ship.is_placed: continue
-		for c in ship.cells:
-			if Vector2i(c.x, c.y) == coord:
+		for i in range(ship.cells.size()):
+			if Vector2i(ship.cells[i].x, ship.cells[i].y) == coord:
+				var ds = ship.get("damaged_sections")
+				if not (ds is Array) or ds.size() != ship.size:
+					ds = []
+					for _j in range(ship.size): ds.append(false)
+				ds[i] = true
+				ship.set("damaged_sections", ds)
 				ship.set("damaged", true)
 				ship.queue_redraw()
 				_check_sunk(ship)
 				return
 
 func _check_sunk(ship: Node2D) -> void:
-	for c in ship.cells:
-		if player_model.grid[c.y][c.x] == 1:
-			return
+	var ds = ship.get("damaged_sections")
+	if not (ds is Array) or ds.size() < ship.size:
+		return
+	for d in ds:
+		if not d: return
 
 	var ship_cells: Array[Vector2i] = []
 	for c in ship.cells:
