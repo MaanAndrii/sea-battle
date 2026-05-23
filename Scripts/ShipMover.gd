@@ -136,35 +136,46 @@ func _refresh_all_ui() -> void:
 		_hide_all_ui()
 		return
 
-	var cs     = selected_ship.cell_size
-	var center = _current_center_px()
+	var cs        = selected_ship.cell_size
+	var gr        = grid_renderer
+	var grid_right = gr.global_position.x + cs * 20.0
+	var grid_top   = gr.global_position.y
 
-	# ── Стрілки ──
-	# Отримуємо межі нижнього поля через grid_renderer
-	var gr          = grid_renderer
-	var grid_left   = gr.global_position.x
-	var grid_right  = gr.global_position.x + cs * 20.0
-	var grid_top    = gr.global_position.y
-	var grid_bottom = gr.global_position.y + cs * 20.0
-	var btn_half    = BTN_SIZE / 2.0
+	# Вертикальна колонка ПРАВОРУЧ від поля
+	var col_x = grid_right + 4.0
+	var cy    = grid_top + 8.0
 
-	# Стрілки — за межами поля по відповідній стороні
-	var positions = [
-		Vector2(center.x, grid_top    - BTN_SIZE.y * 0.5 - 4),   # ▲ над полем
-		Vector2(center.x, grid_bottom + BTN_SIZE.y * 0.5 + 4),   # ▼ під полем
-		Vector2(grid_left  - BTN_SIZE.x * 0.5 - 4, center.y),    # ◄ ліворуч
-		Vector2(grid_right + BTN_SIZE.x * 0.5 + 4, center.y),    # ► праворуч
-	]
+	# Мітка витрат
+	_cost_label.visible  = true
+	_cost_label.text     = "⚡ %d" % energy_spent
+	_cost_label.position = Vector2(col_x, cy)
+	var ratio = float(energy_spent) / float(turn_manager.MAX_ENERGY)
+	var c_col = Color(1.0, 0.3, 0.2) if ratio > 0.7 \
+		else (Color(1.0, 0.85, 0.2) if ratio > 0.4 else Color(0.3, 1.0, 0.4))
+	_cost_label.add_theme_color_override("font_color", c_col)
+	cy += 22.0
+
+	# Тільки стрілки вперед/назад (перпендикулярні — ховаємо)
+	var fwd_dir  = _forward_dir()
+	var bwd_dir  = Vector2i(-fwd_dir.x, -fwd_dir.y)
+	var mov_cost = turn_manager.move_cost(selected_ship.get("damaged") == true)
+	var fwd_btn: Button = null
+	var bwd_btn: Button = null
 	for i in range(4):
-		var btn  = _arrow_btns[i]
-		var cost = turn_manager.move_cost(selected_ship.get("damaged") == true)
-		var can  = _can_move_dir(DIRS[i]) and turn_manager.can_afford(energy_spent + cost)
-		btn.visible  = true
-		btn.disabled = not can
-		btn.modulate = C_ARROW_OK if can else C_ARROW_NO
-		btn.position = positions[i] - btn_half
+		var btn = _arrow_btns[i]
+		if   DIRS[i] == fwd_dir: fwd_btn = btn
+		elif DIRS[i] == bwd_dir: bwd_btn = btn
+		else: btn.visible = false
 
-	# ── Повороти — під полем, поряд зі стрілкою ▼ ──
+	if fwd_btn:
+		var can      = _can_move_dir(fwd_dir) and turn_manager.can_afford(energy_spent + mov_cost)
+		fwd_btn.visible  = true
+		fwd_btn.disabled = not can
+		fwd_btn.modulate = C_ARROW_OK if can else C_ARROW_NO
+		fwd_btn.position = Vector2(col_x, cy)
+	cy += BTN_SIZE.y + 4.0
+
+	# Повороти
 	var rot_cost = turn_manager.rotation_cost(selected_ship.size,
 		selected_ship.get("damaged") == true)
 	var can_rot  = turn_manager.can_afford(energy_spent + rot_cost)
@@ -172,24 +183,25 @@ func _refresh_all_ui() -> void:
 	_rotate_cw.visible   = true
 	_rotate_ccw.disabled = not can_rot
 	_rotate_cw.disabled  = not can_rot
-	# Ліворуч і праворуч від стрілки ▼
-	var down_pos = positions[1] - btn_half
-	_rotate_ccw.position = Vector2(down_pos.x - 58, grid_bottom + 4)
-	_rotate_cw.position  = Vector2(down_pos.x + 58, grid_bottom + 4)
+	_rotate_ccw.modulate = C_ROTATE if can_rot else C_ARROW_NO
+	_rotate_cw.modulate  = C_ROTATE if can_rot else C_ARROW_NO
+	_rotate_ccw.position = Vector2(col_x, cy)
+	cy += _rotate_ccw.size.y + 2.0
+	_rotate_cw.position  = Vector2(col_x, cy)
+	cy += _rotate_cw.size.y + 4.0
 
-	# ── Мітка витрат — над кораблем ──
-	_cost_label.visible  = true
-	_cost_label.text     = "⚡ %d" % energy_spent
-	_cost_label.position = Vector2(center.x - 20, selected_ship.global_position.y - 26)
-	var ratio = float(energy_spent) / float(turn_manager.MAX_ENERGY)
-	var col = Color(1.0, 0.3, 0.2) if ratio > 0.7 \
-		else (Color(1.0, 0.85, 0.2) if ratio > 0.4 else Color(0.3, 1.0, 0.4))
-	_cost_label.add_theme_color_override("font_color", col)
+	if bwd_btn:
+		var can      = _can_move_dir(bwd_dir) and turn_manager.can_afford(energy_spent + mov_cost)
+		bwd_btn.visible  = true
+		bwd_btn.disabled = not can
+		bwd_btn.modulate = C_ARROW_OK if can else C_ARROW_NO
+		bwd_btn.position = Vector2(col_x, cy)
+	cy += BTN_SIZE.y + 4.0
 
-	# ── Кнопка «Виконати хід» — під кораблем ──
+	# Кнопка завершення ходу
 	_commit_btn.visible  = true
-	var _ps = selected_ship.call("pixel_size") as Vector2
-	_commit_btn.position = Vector2(center.x - 80, selected_ship.global_position.y + _ps.y + 8)
+	_commit_btn.size     = Vector2(BTN_SIZE.x, 48)
+	_commit_btn.position = Vector2(col_x, cy)
 
 	queue_redraw()
 

@@ -113,6 +113,10 @@ func _on_turn_received(turn: Dictionary) -> void:
 		var hit_sec: Array = _opponent_ships[idx]["hit_sections"]
 		if hit_sec.size() != sz:
 			while hit_sec.size() < sz: hit_sec.append(false)
+		# Авторитетне підтвердження потоплення від суперника
+		if ship_data.get("sunk", false) and not _opponent_ships[idx].get("marked_sunk", false):
+			_opponent_ships[idx]["marked_sunk"] = true
+			_sink_opponent_ship(_opponent_ships[idx])
 
 	# Застосовуємо постріли суперника по нашому флоту
 	for shot_arr in (turn.get("shots", []) as Array):
