@@ -22,11 +22,20 @@ var turn_manager: Node
 var enemy_setup:  Node
 var enemy_ai:     Node
 
+# Мережевий режим
+var network_manager:  Node  = null
+var network_opponent: Node  = null
+var _my_turn:         bool  = true
+var _pending_shots:   Array[Vector2i] = []
+
 # Поточна фаза: "setup" | "combat"
 var phase: String = "setup"
 
 func _ready() -> void:
 	screen_size = get_viewport().get_visible_rect().size
+
+	# Перевіряємо чи запущені в мережевому режимі
+	network_manager = get_tree().root.get_node_or_null("NetworkManager")
 
 	var bg = ColorRect.new()
 	bg.color = Color(0.05, 0.08, 0.14, 1.0)
@@ -72,11 +81,16 @@ func _ready() -> void:
 	hud.call("setup_turn_manager", turn_manager)
 	hud.end_turn_pressed.connect(_on_end_turn)
 
-	# EnemySetup — кнопка тестової розстановки ворога
-	enemy_setup = Node.new()
-	enemy_setup.set_script(load("res://Scripts/EnemySetup.gd"))
-	add_child(enemy_setup)
-	enemy_setup.call("setup", upper_grid)
+	if network_manager:
+		# Мережевий режим: EnemySetup не потрібен, NetworkOpponent створюється
+		# в _on_setup_confirmed після розстановки флоту.
+		_my_turn = network_manager.my_turn_first
+	else:
+		# Одиночний режим: кнопка тестової розстановки ворога
+		enemy_setup = Node.new()
+		enemy_setup.set_script(load("res://Scripts/EnemySetup.gd"))
+		add_child(enemy_setup)
+		enemy_setup.call("setup", upper_grid)
 
 func _make_grid(gc: Color, bc: Color) -> Node2D:
 	var node = Node2D.new()
@@ -159,31 +173,68 @@ func _on_setup_confirmed() -> void:
 	ship_mover.call("setup", grid_model, lower_grid, turn_manager, ships_ref)
 	ship_mover.visible = true
 
-	# CombatManager
-	combat_manager = Node.new()
-	combat_manager.set_script(load("res://Scripts/CombatManager.gd"))
-	add_child(combat_manager)
-	combat_manager.call("setup", upper_grid, lower_grid, ship_mover, turn_manager, ships_ref, enemy_setup)
-	combat_manager.turn_executed.connect(_on_turn_executed)
-	combat_manager.shot_fired.connect(_on_shot_fired)
+	if network_manager:
+		# ── Мережевий режим ──────────────────────────────────────
+		# NetworkOpponent замінює EnemySetup і EnemyAI
+		network_opponent = Node.new()
+		network_opponent.set_script(load("res://Scripts/NetworkOpponent.gd"))
+		add_child(network_opponent)
+		network_opponent.call("setup", upper_grid, lower_grid,
+				network_manager, grid_model, ships_ref)
 
-	# Зв'язуємо ShipMover з CombatManager
-	ship_mover.set("combat_manager", combat_manager)
+		# CombatManager з network_opponent як p_enemy
+		combat_manager = Node.new()
+		combat_manager.set_script(load("res://Scripts/CombatManager.gd"))
+		add_child(combat_manager)
+		combat_manager.call("setup", upper_grid, lower_grid,
+				ship_mover, turn_manager, ships_ref, network_opponent)
+		combat_manager.turn_executed.connect(_on_turn_executed)
+		combat_manager.shot_fired.connect(_on_shot_fired)
 
-	# Ховаємо кнопку HUD
-	var hud_btn = hud.get("_end_btn")
-	if hud_btn:
-		hud_btn.visible = false
+		ship_mover.set("combat_manager", combat_manager)
 
-	# EnemyAI — постріли ворога
-	enemy_ai = Node.new()
-	enemy_ai.set_script(load("res://Scripts/EnemyAI.gd"))
-	add_child(enemy_ai)
-	enemy_ai.call("setup", lower_grid, grid_model, ships_ref)
+		var hud_btn = hud.get("_end_btn")
+		if hud_btn:
+			hud_btn.visible = false
 
-	lower_label.text = "МОЄ ПОЛЕ  [Фаза бою]" 
+		# Надсилаємо наш флот супернику та чекаємо підтвердження
+		_my_turn = network_manager.my_turn_first
+		network_manager.send_my_fleet(ships_ref)
+		lower_label.text = "МОЄ ПОЛЕ  [Очікуємо суперника...]"
 
-	lower_label.text = "МОЄ ПОЛЕ  [Фаза бою]"
+		# Якщо флот суперника вже отримано (гонка: він надіслав раніше) —
+		# enemy_placed вже спрацював, але блокування UI через _my_turn достатньо.
+		# Якщо ні — чекаємо сигналу network_opponent.enemy_placed.
+		if not network_opponent.get("_opponent_fleet_ready"):
+			await network_opponent.enemy_placed
+
+		lower_label.text = "МОЄ ПОЛЕ  [Фаза бою]"
+	else:
+		# ── Одиночний режим ──────────────────────────────────────
+		# CombatManager
+		combat_manager = Node.new()
+		combat_manager.set_script(load("res://Scripts/CombatManager.gd"))
+		add_child(combat_manager)
+		combat_manager.call("setup", upper_grid, lower_grid,
+				ship_mover, turn_manager, ships_ref, enemy_setup)
+		combat_manager.turn_executed.connect(_on_turn_executed)
+		combat_manager.shot_fired.connect(_on_shot_fired)
+
+		# Зв'язуємо ShipMover з CombatManager
+		ship_mover.set("combat_manager", combat_manager)
+
+		# Ховаємо кнопку HUD
+		var hud_btn = hud.get("_end_btn")
+		if hud_btn:
+			hud_btn.visible = false
+
+		# EnemyAI — постріли ворога
+		enemy_ai = Node.new()
+		enemy_ai.set_script(load("res://Scripts/EnemyAI.gd"))
+		add_child(enemy_ai)
+		enemy_ai.call("setup", lower_grid, grid_model, ships_ref)
+
+		lower_label.text = "МОЄ ПОЛЕ  [Фаза бою]"
 
 # ─────────────────────────────────────────
 #  Input — маршрутизація за фазою
@@ -191,6 +242,10 @@ func _on_setup_confirmed() -> void:
 
 func _input(event: InputEvent) -> void:
 	if phase != "combat":
+		return
+
+	# У мережевому режимі блокуємо ввід якщо зараз не наш хід
+	if network_manager and not _my_turn:
 		return
 
 	var pos: Vector2   = Vector2.ZERO
@@ -229,12 +284,31 @@ func _click_on_ui(pos: Vector2) -> bool:
 # ─────────────────────────────────────────
 
 func _on_turn_executed() -> void:
-	# Після ходу гравця — ворог стріляє
-	if enemy_ai:
-		await enemy_ai.call("execute_turn")
+	if network_manager and network_opponent:
+		# ── Мережевий режим ──────────────────────────────────────
+		# Надсилаємо хід (постріли + позиції кораблів) супернику
+		var ships_ref = []
+		for child in get_children():
+			if child.get_script() and child.is_placed if child.has_method("is_placed") else false:
+				ships_ref.append(child)
+		# Збираємо кораблі через combat_manager
+		var cm_ships = combat_manager.get("all_ships") as Array
+		network_manager.send_turn(_pending_shots, cm_ships if cm_ships else [])
+		_pending_shots.clear()
+		_my_turn = false
+		lower_label.text = "МОЄ ПОЛЕ  [Хід суперника...]"
+		# Чекаємо поки суперник відповість своїм ходом
+		await network_opponent.opponent_turn_applied
+		_my_turn = true
+		lower_label.text = "МОЄ ПОЛЕ  [Фаза бою]"
+	else:
+		# ── Одиночний режим ──────────────────────────────────────
+		if enemy_ai:
+			await enemy_ai.call("execute_turn")
 
 func _on_shot_fired(coord: Vector2i) -> void:
-	print("Постріл зафіксовано: ", coord)
+	# Накопичуємо постріли для надсилання мережею в кінці ходу
+	_pending_shots.append(coord)
 
 func _on_end_turn() -> void:
 	# Ручне завершення ходу через HUD
