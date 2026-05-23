@@ -93,8 +93,13 @@ func _check_sunk(ship: Node2D) -> void:
 	for c in ship.cells:
 		if lower_grid.cell_state[c.y][c.x] != 6:
 			return
+	var wreck_cells: Array[Vector2i] = []
 	for c in ship.cells:
-		lower_grid.set_cell(Vector2i(c.x, c.y), 0)
+		var cv = Vector2i(c.x, c.y)
+		lower_grid.set_cell(cv, 10)
+		wreck_cells.append(cv)
+	if player_model:
+		player_model.add_wreckage(wreck_cells)
 	ship.visible  = false
 	ship.is_placed = false
 

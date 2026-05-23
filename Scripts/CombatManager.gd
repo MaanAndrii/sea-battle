@@ -24,6 +24,7 @@ var plan: Array = []
 var selected_ship:      Node2D = null
 var shots_left:         int    = 0
 var last_fired_noses:   Array[Vector2i] = []   # координати носів що стріляли цього ходу
+var _nose_at_shot_time: Dictionary = {}        # ship → nose Vector2i на момент першого пострілу
 
 # ── UI ────────────────────────────────────
 var _ui_layer:    CanvasLayer = null
@@ -56,6 +57,7 @@ func setup(p_upper: Node2D, p_lower: Node2D, p_mover: Node,
 
 func _init_plan() -> void:
 	plan.clear()
+	_nose_at_shot_time.clear()
 	for ship in all_ships:
 		if ship.is_placed:
 			plan.append({ "ship": ship, "shots": [] as Array[Vector2i] })
@@ -178,6 +180,11 @@ func _add_shot(coord: Vector2i) -> void:
 		_set_status("⚠ Недостатньо енергії!")
 		return
 
+	# Фіксуємо ніс в момент першого пострілу (до можливого подальшого руху)
+	if shots.is_empty() and not _nose_at_shot_time.has(selected_ship):
+		_nose_at_shot_time[selected_ship] = Vector2i(
+			selected_ship.cells[0].x, selected_ship.cells[0].y)
+
 	shots.append(cv)
 	shots_left -= 1
 	# Маркер на верхньому полі
@@ -205,6 +212,7 @@ func _on_undo_shot() -> void:
 	if shots.is_empty():
 		selected_ship.set("shoot_marked", false)
 		selected_ship.queue_redraw()
+		_nose_at_shot_time.erase(selected_ship)   # скасували всі постріли → ніс не зафіксований
 
 	_undo_btn.visible = shots.size() > 0
 	_refresh_info()
@@ -221,13 +229,13 @@ func _on_execute_turn() -> void:
 	# 1. Старіємо маркери з минулого ходу
 	_age_markers()
 
-	# 2. Постріли; збираємо носи кораблів що стріляли (для передачі суперникові)
+	# 2. Постріли; збираємо носи кораблів зафіксовані В МОМЕНТ ПОСТРІЛУ (до руху)
 	last_fired_noses.clear()
 	for entry in plan:
 		var firing_ship := entry["ship"] as Node2D
 		var shots := entry["shots"] as Array
-		if shots.size() > 0 and firing_ship.is_placed and not firing_ship.cells.is_empty():
-			last_fired_noses.append(Vector2i(firing_ship.cells[0].x, firing_ship.cells[0].y))
+		if shots.size() > 0 and _nose_at_shot_time.has(firing_ship):
+			last_fired_noses.append(_nose_at_shot_time[firing_ship])
 		for coord in shots:
 			var c := coord as Vector2i
 			await get_tree().create_timer(0.15).timeout

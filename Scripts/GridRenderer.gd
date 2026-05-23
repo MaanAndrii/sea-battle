@@ -120,6 +120,7 @@ func _draw_cell_fill(x: int, y: int, state: int) -> void:
 		7: color = Color(0.9,  0.75, 0.1,  0.60)  # запланований постріл ⊕
 		8: color = Color(0.85, 0.1,  0.1,  0.28)  # потьмяніле влучання (тур назад)
 		9: color = Color(1.0,  0.85, 0.1,  0.35)  # ніс корабля ⚡ (радар ворога)
+		10: color = Color(0.35, 0.35, 0.4,  0.65)  # уламки ⊗
 		_: color = Color(1,    1,    1,    0.08)
 	draw_rect(rect, color)
 
@@ -150,6 +151,13 @@ func _draw_cell_fill(x: int, y: int, state: int) -> void:
 			draw_line(Vector2(cx - rr * 0.25, cy - rr * 0.05), Vector2(cx + rr * 0.15, cy - rr * 0.05), lc, 2.0)
 			# нижня частина: праворуч-центр → ліворуч-знизу
 			draw_line(Vector2(cx + rr * 0.15, cy - rr * 0.05), Vector2(cx - rr * 0.3, cy + rr), lc, 2.0)
+		10:  # Уламки — сірий хрест ⊗
+			draw_line(Vector2(cx - r, cy - r), Vector2(cx + r, cy + r),
+				Color(0.75, 0.75, 0.8, 0.85), 2.0)
+			draw_line(Vector2(cx + r, cy - r), Vector2(cx - r, cy + r),
+				Color(0.75, 0.75, 0.8, 0.85), 2.0)
+			draw_rect(Rect2(cx - r * 0.45, cy - r * 0.45, r * 0.9, r * 0.9),
+				Color(0.5, 0.5, 0.55, 0.35))
 		7:  # Запланований — прицільник ⊕
 			draw_arc(Vector2(cx, cy), r, 0.0, TAU, 16,
 				Color(1.0, 0.9, 0.2, 0.95), 1.5)
