@@ -81,7 +81,6 @@ func _on_hit(coord: Vector2i) -> void:
 					for _j in range(ship.size): ds.append(false)
 				ds[i] = true
 				ship.set("damaged_sections", ds)
-				ship.set("damaged", true)
 				ship.queue_redraw()
 				_check_sunk(ship)
 				return
