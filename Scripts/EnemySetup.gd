@@ -124,7 +124,20 @@ func mark_hit(coord: Vector2i) -> void:
 				return
 
 func _sink_ship(ship: Dictionary) -> void:
-	# Замінюємо клітинки потопленого корабля на уламки ⊗
-	for c in ship["all_cells"]:
+	var ship_cells: Array = ship["all_cells"]
+
+	# Клітинки корабля → уламки ⊗
+	for c in ship_cells:
 		upper_grid.set_cell(c, 10)
+
+	# Сусідні клітинки → зона уламків
+	for c in ship_cells:
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				if dx == 0 and dy == 0: continue
+				var nb = Vector2i(c.x + dx, c.y + dy)
+				if upper_grid.is_valid(nb) and not ship_cells.has(nb):
+					if upper_grid.cell_state[nb.y][nb.x] != 10:
+						upper_grid.set_cell(nb, 11)
+
 	_ships.erase(ship)

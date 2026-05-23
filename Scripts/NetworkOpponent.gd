@@ -93,14 +93,30 @@ func _check_sunk(ship: Node2D) -> void:
 	for c in ship.cells:
 		if lower_grid.cell_state[c.y][c.x] != 6:
 			return
-	var wreck_cells: Array[Vector2i] = []
+
+	var ship_cells: Array[Vector2i] = []
 	for c in ship.cells:
-		var cv = Vector2i(c.x, c.y)
+		ship_cells.append(Vector2i(c.x, c.y))
+
+	for cv in ship_cells:
 		lower_grid.set_cell(cv, 10)
-		wreck_cells.append(cv)
+
+	var adj_cells: Array[Vector2i] = []
+	for cv in ship_cells:
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				if dx == 0 and dy == 0: continue
+				var nb = Vector2i(cv.x + dx, cv.y + dy)
+				if lower_grid.is_valid(nb) and not ship_cells.has(nb) and not adj_cells.has(nb):
+					if lower_grid.cell_state[nb.y][nb.x] != 10:
+						lower_grid.set_cell(nb, 11)
+					adj_cells.append(nb)
+
 	if player_model:
-		player_model.add_wreckage(wreck_cells)
-	ship.visible  = false
+		player_model.add_wreckage(ship_cells)
+		player_model.add_wreckage(adj_cells)
+
+	ship.modulate  = Color(0.6, 0.6, 0.7, 0.30)
 	ship.is_placed = false
 
 # ── Заглушка execute_turn (EnemyAI інтерфейс) ────────────────
