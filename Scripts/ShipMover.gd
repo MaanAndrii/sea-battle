@@ -222,7 +222,7 @@ func _on_arrow(dir_idx: int) -> void:
 
 	# Оновлюємо GridModel одразу
 	grid_model.remove(selected_ship.cells)
-	var raw = grid_model.place(new_nose, selected_ship.size, selected_ship.is_horizontal)
+	var raw = grid_model.place_from_nose(new_nose, selected_ship.size, selected_ship.rotation_step)
 	var typed: Array[Vector2i] = []
 	for c in raw: typed.append(Vector2i(c.x, c.y))
 	selected_ship.cells = typed
@@ -317,10 +317,10 @@ func _on_commit() -> void:
 
 	# GridModel вже оновлений (кожен крок оновлює його в _on_arrow)
 	# Але перевіряємо що cells відповідає final_nose
-	var expected = grid_model.get_cells(final_nose, selected_ship.size, selected_ship.is_horizontal)
+	var expected = grid_model.cells_from_nose(final_nose, selected_ship.size, selected_ship.rotation_step)
 	if expected != selected_ship.cells:
 		grid_model.remove(selected_ship.cells)
-		var raw2 = grid_model.place(final_nose, selected_ship.size, selected_ship.is_horizontal)
+		var raw2 = grid_model.place_from_nose(final_nose, selected_ship.size, selected_ship.rotation_step)
 		var typed2: Array[Vector2i] = []
 		for c in raw2: typed2.append(Vector2i(c.x, c.y))
 		selected_ship.cells = typed2

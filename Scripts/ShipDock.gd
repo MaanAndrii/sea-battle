@@ -173,7 +173,7 @@ func _begin_drag(ship: Node2D, gpos: Vector2) -> void:
 	drag_was_placed = ship.is_placed
 
 	if ship.is_placed:
-		drag_origin_coord = ship.cells[0]
+		drag_origin_coord = ship.call("tail_cell") as Vector2i
 		grid_model.remove(ship.cells)
 		ship.cells     = []
 		ship.is_placed = false
