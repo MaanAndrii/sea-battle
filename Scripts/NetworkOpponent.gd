@@ -62,6 +62,12 @@ func _on_turn_received(turn: Dictionary) -> void:
 	for shot_arr in (turn.get("shots", []) as Array):
 		_apply_shot(Vector2i(shot_arr[0], shot_arr[1]))
 
+	# ⚡ Показуємо носи кораблів суперника що стріляли — на нашій прицільній карті
+	for nose_arr in (turn.get("noses", []) as Array):
+		var nose := Vector2i(nose_arr[0], nose_arr[1])
+		if upper_grid.cell_state[nose.y][nose.x] == 0:
+			upper_grid.set_cell(nose, 9)
+
 	opponent_turn_applied.emit()
 
 func _apply_shot(coord: Vector2i) -> void:
