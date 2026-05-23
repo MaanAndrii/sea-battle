@@ -255,11 +255,12 @@ func _resolve_shot(coord: Vector2i, firing_ship: Node2D = null):
 		is_hit = upper_grid.cell_state[coord.y][coord.x] == 1
 	upper_grid.set_cell(coord, 6 if is_hit else 5)
 
-	# Позначаємо ніс корабля що стріляв (тільки на порожній клітинці)
+	# Засвічуємо ніс корабля що стріляв на нижньому полі (радар ворога)
 	if firing_ship and firing_ship.is_placed and not firing_ship.cells.is_empty():
 		var nose := Vector2i(firing_ship.cells[0].x, firing_ship.cells[0].y)
-		if upper_grid.cell_state[nose.y][nose.x] == 0:
-			upper_grid.set_cell(nose, 9)
+		var ns = lower_grid.cell_state[nose.y][nose.x]
+		if ns != 6 and ns != 8:   # не перекриваємо маркери влучань
+			lower_grid.set_cell(nose, 9)
 
 	await get_tree().create_timer(0.1).timeout
 
@@ -272,12 +273,12 @@ func _age_markers() -> void:
 			match upper_grid.cell_state[y][x]:
 				8: upper_grid.set_cell(Vector2i(x, y), 0)   # старе потьмяніле → зникає
 				6: upper_grid.set_cell(Vector2i(x, y), 8)   # влучання → потьмяніти
-				9: upper_grid.set_cell(Vector2i(x, y), 0)   # ніс минулого ходу → зникає
-	# Нижнє поле (постріли ворога по нас) — очищаємо промахи ворога
+	# Нижнє поле: промахи ворога зникають, маркер носа минулого ходу зникає
 	for y in range(20):
 		for x in range(20):
-			if lower_grid.cell_state[y][x] == 5:
-				lower_grid.set_cell(Vector2i(x, y), 0)
+			match lower_grid.cell_state[y][x]:
+				5: lower_grid.set_cell(Vector2i(x, y), 0)   # промах ворога → зникає
+				9: lower_grid.set_cell(Vector2i(x, y), 0)   # ніс минулого ходу → зникає
 
 func _clear_misses() -> void:
 	for y in range(20):
