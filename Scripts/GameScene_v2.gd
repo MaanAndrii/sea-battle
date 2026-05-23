@@ -197,16 +197,15 @@ func _on_setup_confirmed() -> void:
 		if hud_btn:
 			hud_btn.visible = false
 
-		# Надсилаємо наш флот супернику та чекаємо підтвердження
-		_my_turn = network_manager.my_turn_first
+		# Надсилаємо наш флот супернику
 		network_manager.send_my_fleet(ships_ref)
 		lower_label.text = "МОЄ ПОЛЕ  [Очікуємо суперника...]"
 
-		# Якщо флот суперника вже отримано (гонка: він надіслав раніше) —
-		# enemy_placed вже спрацював, але блокування UI через _my_turn достатньо.
-		# Якщо ні — чекаємо сигналу network_opponent.enemy_placed.
-		if not network_opponent.get("_opponent_fleet_ready"):
-			await network_opponent.enemy_placed
+		# Чекаємо поки обидва флоти обмінялись — both_ready встановлює my_turn_first
+		# _game_started — захист від гонки (якщо RPC прийшов до await)
+		if not network_manager.get("_game_started"):
+			await network_manager.both_ready
+		_my_turn = network_manager.my_turn_first
 
 		lower_label.text = "МОЄ ПОЛЕ  [Фаза бою]"
 	else:

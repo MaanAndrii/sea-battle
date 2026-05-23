@@ -20,8 +20,9 @@ var _my_fleet_sent:   bool = false
 var _opp_fleet_rcvd:  bool = false
 var _opponent_id:     int  = 0
 
-## Запам'ятовуємо чи ходимо першими — GameScene читає це поле після зміни сцени
+## Читається GameScene після зміни сцени
 var my_turn_first: bool = true
+var _game_started: bool = false
 
 func setup(p_transport: Node) -> void:
 	transport = p_transport
@@ -30,10 +31,11 @@ func setup(p_transport: Node) -> void:
 
 func _on_peer_connected(id: int) -> void:
 	_opponent_id = id
-	opponent_connected.emit()
+	opponent_connected.emit()   # SERVER: клієнт підключився
 
 func _on_connected_to_server() -> void:
 	_opponent_id = 1
+	opponent_connected.emit()   # CLIENT: ми підключились до сервера
 
 # ── Розстановка ───────────────────────────────────────────────
 
@@ -57,6 +59,7 @@ func _check_both_ready() -> void:
 @rpc("call_local", "reliable")
 func _rpc_game_start(first_id: int) -> void:
 	my_turn_first = (transport.my_id() == first_id)
+	_game_started = true
 	both_ready.emit(my_turn_first)
 
 # ── Хід ──────────────────────────────────────────────────────
