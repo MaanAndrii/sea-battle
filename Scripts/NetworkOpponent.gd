@@ -14,7 +14,9 @@ var player_model             = null
 var all_ships:       Array  = []
 
 # Поточний флот суперника — використовується тільки для is_hit/mark_hit
-# Структура: { ship_name → { "size", "current_cells": [[x,y],...], "hit_sections": Array[bool] } }
+# Структура: { fleet_idx → { "size", "current_cells": [[x,y],...], "hit_sections": Array[bool] } }
+# Ключ fleet_idx — стабільний індекс з _serialize_fleet, унікальний для кожного корабля
+# незалежно від однакових назв (2×Лінкор, 3×Фрегат, 4×Корвет).
 var _opponent_ships: Dictionary = {}
 var _opponent_fleet_ready: bool = false
 var _opponent_turn_ready:  bool = false
@@ -34,12 +36,13 @@ func setup(p_upper: Node2D, p_lower: Node2D,
 func _on_fleet_received(fleet: Array) -> void:
 	_opponent_ships.clear()
 	for ship_data in fleet:
-		var name_key: String = ship_data.get("name", "")
-		var cells: Array     = ship_data.get("cells", [])
-		var sz: int          = cells.size()
-		var hit_sec: Array   = []
+		var idx: int     = ship_data.get("fleet_idx", -1)
+		if idx < 0: continue
+		var cells: Array = ship_data.get("cells", [])
+		var sz: int      = cells.size()
+		var hit_sec: Array = []
 		for _i in range(sz): hit_sec.append(false)
-		_opponent_ships[name_key] = {
+		_opponent_ships[idx] = {
 			"size":          sz,
 			"current_cells": cells.duplicate(true),
 			"hit_sections":  hit_sec,
@@ -50,15 +53,15 @@ func _on_fleet_received(fleet: Array) -> void:
 # ── Інтерфейс CombatManager (is_hit / mark_hit) ──────────────
 
 func is_hit(coord: Vector2i) -> bool:
-	for ship_name in _opponent_ships:
-		for ca in _opponent_ships[ship_name]["current_cells"]:
+	for idx in _opponent_ships:
+		for ca in _opponent_ships[idx]["current_cells"]:
 			if ca[0] == coord.x and ca[1] == coord.y:
 				return true
 	return false
 
 func mark_hit(coord: Vector2i) -> void:
-	for ship_name in _opponent_ships:
-		var entry   = _opponent_ships[ship_name]
+	for idx in _opponent_ships:
+		var entry   = _opponent_ships[idx]
 		var cells   = entry["current_cells"] as Array
 		var hit_sec = entry["hit_sections"]  as Array
 		for i in range(cells.size()):
@@ -100,17 +103,16 @@ func _on_turn_received(turn: Dictionary) -> void:
 	# Оновлюємо поточні позиції кораблів суперника
 	var moves := turn.get("moves", []) as Array
 	for ship_data in moves:
-		var name_key: String = ship_data.get("name", "")
-		if _opponent_ships.has(name_key):
-			# Оновлюємо поточні клітинки; hit_sections залишаються незмінними
-			var new_cells: Array = ship_data.get("cells", [])
-			_opponent_ships[name_key]["current_cells"] = new_cells.duplicate(true)
-			# Розмір міг не змінитися, але на всяк випадок синхронізуємо
-			var sz: int      = new_cells.size()
-			var hit_sec: Array = _opponent_ships[name_key]["hit_sections"]
-			if hit_sec.size() != sz:
-				# Якщо розмір змінився (не повинно, але захист) — розширюємо
-				while hit_sec.size() < sz: hit_sec.append(false)
+		var idx: int = ship_data.get("fleet_idx", -1)
+		if idx < 0 or not _opponent_ships.has(idx):
+			continue
+		# Оновлюємо поточні клітинки; hit_sections залишаються незмінними
+		var new_cells: Array = ship_data.get("cells", [])
+		_opponent_ships[idx]["current_cells"] = new_cells.duplicate(true)
+		var sz: int        = new_cells.size()
+		var hit_sec: Array = _opponent_ships[idx]["hit_sections"]
+		if hit_sec.size() != sz:
+			while hit_sec.size() < sz: hit_sec.append(false)
 
 	# Застосовуємо постріли суперника по нашому флоту
 	for shot_arr in (turn.get("shots", []) as Array):
