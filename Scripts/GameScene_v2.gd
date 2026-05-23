@@ -207,6 +207,13 @@ func _on_setup_confirmed() -> void:
 			await network_manager.both_ready
 		_my_turn = network_manager.my_turn_first
 
+		if not _my_turn:
+			# Гравець Б ходить другим — чекаємо першого ходу суперника
+			lower_label.text = "МОЄ ПОЛЕ  [Хід суперника...]"
+			if not network_opponent.get("_opponent_turn_ready"):
+				await network_opponent.opponent_turn_applied
+			_my_turn = true
+
 		lower_label.text = "МОЄ ПОЛЕ  [Фаза бою]"
 	else:
 		# ── Одиночний режим ──────────────────────────────────────

@@ -13,8 +13,9 @@ var network_manager: Node   = null
 var player_model             = null
 var all_ships:       Array  = []
 
-var _opponent_fleet: Array = []   # поточні позиції флоту суперника
-var _opponent_fleet_ready: bool = false  # true після першого отримання флоту
+var _opponent_fleet: Array = []
+var _opponent_fleet_ready: bool = false
+var _opponent_turn_ready:  bool = false  # true як тільки перший хід суперника отримано
 
 func setup(p_upper: Node2D, p_lower: Node2D,
 		p_net: Node, p_model, p_ships: Array) -> void:
@@ -68,6 +69,7 @@ func _on_turn_received(turn: Dictionary) -> void:
 		if upper_grid.cell_state[nose.y][nose.x] == 0:
 			upper_grid.set_cell(nose, 9)
 
+	_opponent_turn_ready = true
 	opponent_turn_applied.emit()
 
 func _apply_shot(coord: Vector2i) -> void:
