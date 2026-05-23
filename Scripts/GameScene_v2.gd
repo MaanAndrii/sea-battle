@@ -286,18 +286,13 @@ func _click_on_ui(pos: Vector2) -> bool:
 func _on_turn_executed() -> void:
 	if network_manager and network_opponent:
 		# ── Мережевий режим ──────────────────────────────────────
-		# Надсилаємо хід (постріли + позиції кораблів) супернику
-		var ships_ref = []
-		for child in get_children():
-			if child.get_script() and child.is_placed if child.has_method("is_placed") else false:
-				ships_ref.append(child)
-		# Збираємо кораблі через combat_manager
-		var cm_ships = combat_manager.get("all_ships") as Array
-		network_manager.send_turn(_pending_shots, cm_ships if cm_ships else [])
+		# Надсилаємо хід: постріли + поточні позиції всіх кораблів
+		var cm_ships: Array = combat_manager.get("all_ships")
+		network_manager.send_turn(_pending_shots, cm_ships)
 		_pending_shots.clear()
 		_my_turn = false
 		lower_label.text = "МОЄ ПОЛЕ  [Хід суперника...]"
-		# Чекаємо поки суперник відповість своїм ходом
+		# Чекаємо поки суперник надішле свій хід
 		await network_opponent.opponent_turn_applied
 		_my_turn = true
 		lower_label.text = "МОЄ ПОЛЕ  [Фаза бою]"
