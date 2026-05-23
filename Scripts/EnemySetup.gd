@@ -124,7 +124,7 @@ func mark_hit(coord: Vector2i) -> void:
 				return
 
 func _sink_ship(ship: Dictionary) -> void:
-	# Прибираємо всі клітинки потопленого корабля з поля (включно з маркерами влучань)
+	# Замінюємо клітинки потопленого корабля на уламки ⊗
 	for c in ship["all_cells"]:
-		upper_grid.set_cell(c, 0)
+		upper_grid.set_cell(c, 10)
 	_ships.erase(ship)

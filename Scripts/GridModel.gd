@@ -1,5 +1,5 @@
 ## GridModel.gd
-## 0=вільно, 1=корабель, 2=заборонена зона
+## 0=вільно, 1=корабель, 2=заборонена зона, 3=уламки (блокує розміщення)
 ## ВАЖЛИВО: place_from_nose — основний метод розміщення
 ## cells[0] завжди = ніс корабля
 
@@ -14,6 +14,12 @@ func _init() -> void:
 		var row = []
 		for x in range(SIZE): row.append(0)
 		grid.append(row)
+
+func add_wreckage(cells: Array) -> void:
+	for c in cells:
+		var v = Vector2i(int(c.x), int(c.y))
+		if _in_bounds(v):
+			grid[v.y][v.x] = 3
 
 # ── Утиліта: всі клітинки від носа ─────────────────────────
 ## step=0(→): хвіст ліворуч  step=1(↓): хвіст вгору
@@ -46,7 +52,8 @@ func can_place_excluding_nose(nose: Vector2i, size: int, step: int,
 	for c in new_cells:
 		if not _in_bounds(c): return false
 		var v = Vector2i(c.x, c.y)
-		if grid[c.y][c.x] == 1 and not own_set.has(v):
+		var gv = grid[c.y][c.x]
+		if (gv == 1 and not own_set.has(v)) or gv == 3:
 			return false
 	# Перевірка відступу від чужих кораблів
 	for c in new_cells:
@@ -102,7 +109,8 @@ func can_place_excluding(coord: Vector2i, size: int, horizontal: bool,
 	var new_cells = get_cells(coord, size, horizontal)
 	for c in new_cells:
 		if not _in_bounds(c): return false
-		if grid[c.y][c.x] == 1 and not own_set.has(Vector2i(c.x, c.y)):
+		var gv = grid[c.y][c.x]
+		if (gv == 1 and not own_set.has(Vector2i(c.x, c.y))) or gv == 3:
 			return false
 	for c in new_cells:
 		for dy in range(-1, 2):
