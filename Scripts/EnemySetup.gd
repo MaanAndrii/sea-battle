@@ -141,3 +141,13 @@ func _sink_ship(ship: Dictionary) -> void:
 						upper_grid.set_cell(nb, 11)
 
 	_ships.erase(ship)
+
+## Instantly sink the ship containing the given position (for bomb hits).
+func sink_ship_at(pos: Vector2i) -> bool:
+	for ship in _ships:
+		var rem: Array = ship["remaining"]
+		for c in rem:
+			if c == pos:
+				_sink_ship(ship)
+				return true
+	return false

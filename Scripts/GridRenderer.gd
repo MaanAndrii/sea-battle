@@ -122,6 +122,7 @@ func _draw_cell_fill(x: int, y: int, state: int) -> void:
 		9: color = Color(1.0,  0.85, 0.1,  0.35)  # ніс корабля ⚡ (радар ворога)
 		10: color = Color(0.35, 0.35, 0.4,  0.65)  # уламки ⊗
 		11: color = Color(0.3,  0.3,  0.38, 0.28)  # зона уламків (сусідні клітинки)
+		12: color = Color(0.80, 0.45, 0.05, 0.80)  # бомба 💣
 		_: color = Color(1,    1,    1,    0.08)
 	draw_rect(rect, color)
 
@@ -175,6 +176,10 @@ func _draw_cell_fill(x: int, y: int, state: int) -> void:
 				Color(1.0, 0.9, 0.2, 0.95), 1.5)
 			draw_line(Vector2(cx, cy - r * 1.4), Vector2(cx, cy + r * 1.4),
 				Color(1.0, 0.9, 0.2, 0.95), 1.5)
+		12:  # Bomb
+			draw_circle(Vector2(cx, cy + r*0.15), r * 0.72, Color(0.12, 0.12, 0.12, 0.95))
+			draw_line(Vector2(cx, cy - r*0.57), Vector2(cx + r*0.4, cy - r*1.15), Color(0.45, 0.35, 0.1, 0.9), 1.8)
+			draw_circle(Vector2(cx + r*0.4, cy - r*1.15), r * 0.28, Color(1.0, 0.85, 0.1, 0.95))
 
 func _draw_highlight(x: int, y: int) -> void:
 	var rect  = _cell_rect(x, y)

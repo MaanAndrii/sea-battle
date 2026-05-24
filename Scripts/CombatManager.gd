@@ -27,6 +27,10 @@ var last_fired_noses:   Array[Vector2i] = []
 var _nose_at_shot_time: Dictionary = {}
 var _busy:              bool   = false   # true під час виконання ходу / ходу ворога
 
+# ── Drone ─────────────────────────────────
+var drone_manager: Node = null
+var last_drone_data: Dictionary = {}
+
 # ── UI ────────────────────────────────────
 var _ui_layer:    CanvasLayer = null
 var _status_lbl:  Label       = null
@@ -135,9 +139,13 @@ func handle_input(gpos: Vector2) -> void:
 	# Тап на верхнє поле → постріл (якщо є вибраний корабель)
 	var upper_coord = upper_grid.world_to_grid(gpos)
 	if upper_grid.is_valid(upper_coord):
+		if drone_manager and drone_manager.handle_upper_click(upper_coord):
+			return
 		if selected_ship != null and shots_left > 0:
 			_add_shot(upper_coord)
 		return
+	if drone_manager and drone_manager.launch_pending:
+		drone_manager.cancel_launch()
 
 	# Тап на нижнє поле → вибір/зняття корабля для руху
 	_try_select_ship(gpos)
@@ -173,6 +181,8 @@ func _select(ship: Node2D) -> void:
 
 	_refresh_info()
 	_refresh_status()
+	if drone_manager and ship.size == 5:
+		drone_manager.set_carrier_ui_visible(true)
 
 func _deselect() -> void:
 	selected_ship = null
@@ -183,6 +193,8 @@ func _deselect() -> void:
 	_info_lbl.visible = false
 	_undo_btn.visible = false
 	_refresh_status()
+	if drone_manager:
+		drone_manager.set_carrier_ui_visible(false)
 
 # ─────────────────────────────────────────
 #  Пострілів
@@ -256,6 +268,16 @@ func _on_execute_turn() -> void:
 	# 1. Старіємо маркери з минулого ходу
 	_age_markers()
 
+	# 1b. Дрони: розвідка та перевірка бомб
+	if drone_manager:
+		# Reveal enemy positions under active drones
+		drone_manager.reveal_all()
+		# Check own ships on opponent bombs
+		drone_manager.check_and_sink_own_ships_on_opp_bombs(all_ships)
+		# Single-player: check enemy ships on own bombs
+		if not (enemy_setup and enemy_setup.has_method("_on_fleet_received")):
+			drone_manager.check_and_sink_enemy_on_own_bombs()
+
 	# 2. Постріли; збираємо носи кораблів зафіксовані В МОМЕНТ ПОСТРІЛУ (до руху)
 	last_fired_noses.clear()
 	for entry in plan:
@@ -279,6 +301,13 @@ func _on_execute_turn() -> void:
 	turn_manager.end_turn()
 	_init_plan()
 	_refresh_status()
+
+	# Age drones and collect bomb data for network
+	if drone_manager:
+		last_drone_data = drone_manager.on_turn_executed()
+	else:
+		last_drone_data = {}
+
 	emit_signal("turn_executed")
 	# Кнопка залишається заблокованою до виклику resume() з GameScene
 

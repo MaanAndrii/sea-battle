@@ -21,6 +21,8 @@ var _opponent_ships: Dictionary = {}
 var _opponent_fleet_ready: bool = false
 var _opponent_turn_ready:  bool = false
 
+var drone_manager: Node = null
+
 func setup(p_upper: Node2D, p_lower: Node2D,
 		p_net: Node, p_model, p_ships: Array) -> void:
 	upper_grid      = p_upper
@@ -121,6 +123,16 @@ func _on_turn_received(turn: Dictionary) -> void:
 		if ship_data.get("sunk", false) and not _opponent_ships[idx].get("marked_sunk", false):
 			_opponent_ships[idx]["marked_sunk"] = true
 			_sink_opponent_ship(_opponent_ships[idx])
+
+	# Receive new bombs from opponent
+	if drone_manager:
+		for bomb_arr in (turn.get("new_bombs", []) as Array):
+			drone_manager.receive_opp_bomb(Vector2i(bomb_arr[0], bomb_arr[1]))
+
+	# Check opponent ships vs our own bombs
+	if drone_manager:
+		drone_manager.apply_bomb_check_to_opp_ships(_opponent_ships,
+			func(entry): _sink_opponent_ship(entry))
 
 	# Застосовуємо постріли суперника по нашому флоту
 	for shot_arr in (turn.get("shots", []) as Array):
