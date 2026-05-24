@@ -266,11 +266,13 @@ func _clear_drone_cell(pos: Vector2i) -> void:
 
 func _select_drone(drone) -> void:
 	selected_drone = drone
+	_refresh_selected_drone_highlight()
 	_refresh_drone_controls()
 	_refresh_drone_panel()
 
 func _deselect_drone() -> void:
 	selected_drone = null
+	_refresh_selected_drone_highlight()
 	_hide_drone_controls()
 	_refresh_drone_panel()
 
@@ -293,6 +295,7 @@ func _move_selected(dir: Vector2i) -> void:
 	_clear_drone_cell(selected_drone.pos)
 	selected_drone.pos = new_pos
 	upper_grid.set_cell(new_pos, 4)
+	_refresh_selected_drone_highlight()
 	_reveal_area(selected_drone)
 	_refresh_drone_controls()
 
@@ -436,6 +439,7 @@ func _refresh_drone_controls() -> void:
 	_bomb_btn.position = _col_pos(cy)
 
 func _refresh_ui_after_age() -> void:
+	_refresh_selected_drone_highlight()
 	if selected_drone:
 		_refresh_drone_controls()
 
@@ -443,6 +447,13 @@ func _hide_drone_controls() -> void:
 	for btn in _move_btns: btn.visible = false
 	_bomb_btn.visible = false
 	_info_lbl.visible = false
+
+func _refresh_selected_drone_highlight() -> void:
+	if selected_drone:
+		upper_grid.set_highlight([selected_drone.pos])
+	else:
+		var empty: Array[Vector2i] = []
+		upper_grid.set_highlight(empty)
 
 # ── Positioning ───────────────────────────────────────────────
 
