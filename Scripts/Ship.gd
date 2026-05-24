@@ -16,6 +16,7 @@ var setup_locked:     bool   = false
 var damaged_sections: Array  = []   # Array[bool], size = size, index 0 = ніс
 var shoot_marked:     bool   = false
 var has_moved:        bool   = false
+var is_selected:      bool   = false
 var cell_size:        float  = 16.0
 
 ## Є хоча б одна уражена секція
@@ -39,6 +40,7 @@ const C_SECTION_LINE = Color(0.08, 0.10, 0.16, 0.38)   # лінія між се�
 const C_NOSE_NORMAL  = Color(0.20, 1.00, 0.35, 1.00)
 const C_NOSE_SHOT    = Color(1.00, 0.18, 0.10, 1.00)
 const C_STERN_LINE   = Color(0.50, 0.68, 1.00, 0.75)
+const C_SELECTED_GLOW = Color(1.00, 0.95, 0.35, 0.95)
 
 func setup(p_name: String, p_size: int, p_cell_size: float) -> void:
 	ship_name = p_name
@@ -162,6 +164,9 @@ func _draw() -> void:
 	var bw = 2.0 if (is_placed and damaged) else 1.2
 	draw_rect(Rect2(m, m, ps.x-m*2, ps.y-m*2),
 		C_BORDER_DMG if damaged else C_BORDER, false, bw)
+	if is_selected and is_placed and not sunk:
+		draw_rect(Rect2(m - 1.5, m - 1.5, ps.x - (m - 1.5) * 2, ps.y - (m - 1.5) * 2),
+			C_SELECTED_GLOW, false, 2.6)
 
 	# Ніс і корма
 	_draw_nose(ps)
