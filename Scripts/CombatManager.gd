@@ -41,6 +41,7 @@ var _fleet_panel: Control     = null
 
 const C_COMMIT = Color(0.2, 0.9, 0.4, 1.0)
 const C_UNDO   = Color(0.6, 0.6, 0.6, 0.9)
+const CellState = preload("res://Scripts/CellState.gd")
 
 # ─────────────────────────────────────────
 #  Ініціалізація
@@ -76,7 +77,7 @@ func _build_ui() -> void:
 
 	# Статус угорі
 	_status_lbl = Label.new()
-	_status_lbl.position = Vector2(8, 4)
+	_status_lbl.position = Vector2(8, vp.y - 130)
 	_status_lbl.size     = Vector2(vp.x - 16, 22)
 	_status_lbl.add_theme_font_size_override("font_size", 12)
 	_status_lbl.add_theme_color_override("font_color", Color(0.8, 0.95, 1.0))
@@ -85,7 +86,7 @@ func _build_ui() -> void:
 
 	# Інфо про вибраний корабель
 	_info_lbl = Label.new()
-	_info_lbl.position = Vector2(8, vp.y - 100)
+	_info_lbl.position = Vector2(8, vp.y - 106)
 	_info_lbl.size     = Vector2(vp.x - 16, 22)
 	_info_lbl.add_theme_font_size_override("font_size", 12)
 	_info_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5))
@@ -158,9 +159,13 @@ func _on_fleet_panel_ship_clicked(ship: Node2D) -> void:
 func _select(ship: Node2D) -> void:
 	# Знімаємо попередній вибір
 	if selected_ship and selected_ship != ship:
+		selected_ship.set("is_selected", false)
+		selected_ship.queue_redraw()
 		ship_mover.call("_deselect")
 
 	selected_ship = ship
+	selected_ship.set("is_selected", true)
+	selected_ship.queue_redraw()
 	shots_left    = turn_manager.shots_for_size(ship.size) - _shots_used(ship)
 
 	# Активуємо ShipMover для руху
@@ -172,6 +177,9 @@ func _select(ship: Node2D) -> void:
 		drone_manager.set_carrier_ui_visible(true)
 
 func _deselect() -> void:
+	if selected_ship:
+		selected_ship.set("is_selected", false)
+		selected_ship.queue_redraw()
 	selected_ship = null
 	shots_left    = 0
 	ship_mover.call("_deselect")
@@ -193,7 +201,7 @@ func _add_shot(coord: Vector2i) -> void:
 	var cv    = Vector2i(coord.x, coord.y)
 	# Блокуємо стрільбу по уламках
 	var cell_st = upper_grid.cell_state[coord.y][coord.x]
-	if cell_st == 10 or cell_st == 11:
+	if cell_st == CellState.WRECK or cell_st == CellState.WRECK_ZONE:
 		_set_status("⚠ Ця клітинка зайнята уламками!")
 		return
 	if cv in shots:
@@ -211,7 +219,7 @@ func _add_shot(coord: Vector2i) -> void:
 	shots.append(cv)
 	shots_left -= 1
 	# Маркер на верхньому полі
-	upper_grid.set_cell(coord, 7)
+	upper_grid.set_cell(coord, CellState.PLANNED_SHOT)
 	# Мітка на носі корабля
 	selected_ship.set("shoot_marked", true)
 	selected_ship.queue_redraw()
@@ -306,7 +314,7 @@ func resume() -> void:
 func _resolve_shot(coord: Vector2i):
 	# Не стріляємо по уламках (захист від переписування стану 10/11)
 	var existing = upper_grid.cell_state[coord.y][coord.x]
-	if existing == 10 or existing == 11:
+	if existing == CellState.WRECK or existing == CellState.WRECK_ZONE:
 		await get_tree().create_timer(0.1).timeout
 		return
 	var is_hit = false
@@ -319,8 +327,8 @@ func _resolve_shot(coord: Vector2i):
 	# mark_hit може виставити state 10 (уламки) якщо корабель потоплено —
 	# не перекриваємо його маркером влучання/промаху
 	var post = upper_grid.cell_state[coord.y][coord.x]
-	if post != 10 and post != 11:
-		upper_grid.set_cell(coord, 6 if is_hit else 5)
+	if post != CellState.WRECK and post != CellState.WRECK_ZONE:
+		upper_grid.set_cell(coord, CellState.HIT if is_hit else CellState.MISS)
 	await get_tree().create_timer(0.1).timeout
 
 # ── Управління маркерами ──────────────────────────────────────
@@ -330,24 +338,24 @@ func _age_markers() -> void:
 	for y in range(20):
 		for x in range(20):
 			match upper_grid.cell_state[y][x]:
-				8: upper_grid.set_cell(Vector2i(x, y), 0)   # старе потьмяніле → зникає
-				6: upper_grid.set_cell(Vector2i(x, y), 8)   # влучання → потьмяніти
-				9: upper_grid.set_cell(Vector2i(x, y), 0)   # ніс минулого ходу → зникає
-				5: upper_grid.set_cell(Vector2i(x, y), 0)   # промах минулого ходу → зникає
+				CellState.OLD_HIT: upper_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)   # старе потьмяніле → зникає
+				CellState.HIT: upper_grid.set_cell(Vector2i(x, y), CellState.OLD_HIT)   # влучання → потьмяніти
+				CellState.NOSE_MARK: upper_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)   # ніс минулого ходу → зникає
+				CellState.MISS: upper_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)   # промах минулого ходу → зникає
 	# Нижнє поле: промахи та маркери влучань ворога старіють
 	for y in range(20):
 		for x in range(20):
 			match lower_grid.cell_state[y][x]:
-				5: lower_grid.set_cell(Vector2i(x, y), 0)   # промах → зникає
-				8: lower_grid.set_cell(Vector2i(x, y), 0)   # потьмяніле влучання → зникає
-				6: lower_grid.set_cell(Vector2i(x, y), 8)   # влучання → потьмяніти
+				CellState.MISS: lower_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)   # промах → зникає
+				CellState.OLD_HIT: lower_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)   # потьмяніле влучання → зникає
+				CellState.HIT: lower_grid.set_cell(Vector2i(x, y), CellState.OLD_HIT)   # влучання → потьмяніти
 				# Стани 10, 11 (уламки) — ніколи не стираємо
 
 func _clear_misses() -> void:
 	for y in range(20):
 		for x in range(20):
-			if upper_grid.cell_state[y][x] == 5:
-				upper_grid.set_cell(Vector2i(x, y), 0)
+			if upper_grid.cell_state[y][x] == CellState.MISS:
+				upper_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)
 
 # ─────────────────────────────────────────
 #  UI оновлення
