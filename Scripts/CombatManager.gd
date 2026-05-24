@@ -74,10 +74,11 @@ func _init_plan() -> void:
 
 func _build_ui() -> void:
 	var vp = get_viewport().get_visible_rect().size
+	var hud_top = upper_grid.global_position.y + upper_grid.cell_size * 20.0 + 6.0
 
 	# Статус угорі
 	_status_lbl = Label.new()
-	_status_lbl.position = Vector2(8, vp.y - 130)
+	_status_lbl.position = Vector2(8, hud_top)
 	_status_lbl.size     = Vector2(vp.x - 16, 22)
 	_status_lbl.add_theme_font_size_override("font_size", 12)
 	_status_lbl.add_theme_color_override("font_color", Color(0.8, 0.95, 1.0))
@@ -86,7 +87,7 @@ func _build_ui() -> void:
 
 	# Інфо про вибраний корабель
 	_info_lbl = Label.new()
-	_info_lbl.position = Vector2(8, vp.y - 106)
+	_info_lbl.position = Vector2(8, hud_top + 20.0)
 	_info_lbl.size     = Vector2(vp.x - 16, 22)
 	_info_lbl.add_theme_font_size_override("font_size", 12)
 	_info_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5))
