@@ -5,9 +5,25 @@
 
 extends Control
 
+signal ship_clicked(ship)
+
 var all_ships:    Array = []
 var plan_ref:     Array = []   # посилання на CombatManager.plan (той самий масив)
 var selected_ship         = null
+
+func _ready() -> void:
+	mouse_filter = Control.MOUSE_FILTER_STOP
+
+func _gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton): return
+	if not event.pressed or event.button_index != MOUSE_BUTTON_LEFT: return
+	if all_ships.is_empty(): return
+	var n     = all_ships.size()
+	var row_h = clamp(size.y / float(n), 18.0, 36.0)
+	var idx   = int(event.position.y / row_h)
+	if idx < 0 or idx >= n: return
+	emit_signal("ship_clicked", all_ships[idx])
+	accept_event()
 
 const C_INTACT   = Color(0.18, 0.44, 0.90, 0.85)
 const C_HIT      = Color(0.72, 0.10, 0.04, 0.90)

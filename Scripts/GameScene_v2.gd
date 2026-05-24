@@ -303,7 +303,20 @@ func _input(event: InputEvent) -> void:
 	combat_manager.call("handle_input", pos)
 
 func _click_on_ui(pos: Vector2) -> bool:
+	# Fleet panel (left of lower grid) — captures clicks for ship selection
+	if combat_manager:
+		var fp = combat_manager.get("_fleet_panel")
+		if fp and fp.visible:
+			if Rect2(fp.position, fp.size).has_point(pos):
+				return true
+
+	# Drone panel (left of upper grid)
 	var dm = combat_manager.get("drone_manager") if combat_manager else null
+	if dm and dm.has_method("get_drone_panel_rect"):
+		if dm.get_drone_panel_rect().has_point(pos):
+			return true
+
+	# All visible buttons in UI layers
 	var layers = [ship_mover.get("_ui_layer"), combat_manager.get("_ui_layer"),
 		dm.get("_ui_layer") if dm else null]
 	for layer in layers:

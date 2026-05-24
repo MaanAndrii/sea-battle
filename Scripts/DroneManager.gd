@@ -1,17 +1,19 @@
 ## DroneManager.gd
-## Авіаносець: 3 дрони, 4 ходи кожен, 2 бомби/дрон.
+## Авіаносець: 3 дрони, 2 ходи кожен, 2 бомби/дрон.
 ## Розвідка 3×3, керування на верхній карті.
+## Вибір дронів — ліва панель; рух — права колонка.
 
 extends Node
 
 class DroneInfo:
-	var id:         int      = 0
-	var pos:        Vector2i = Vector2i.ZERO
-	var turns_left: int      = 4
-	var bombs_left: int      = 2
+	var id:             int      = 0
+	var pos:            Vector2i = Vector2i.ZERO
+	var turns_left:     int      = 2
+	var bombs_left:     int      = 2
+	var revealed_cells: Array    = []   # cells currently showing intel (state 1) by this drone
 
 const MAX_DRONES  = 3
-const DRONE_TURNS = 4
+const DRONE_TURNS = 2
 const DRONE_BOMBS = 2
 const DIRS        = [Vector2i(0,-1), Vector2i(0,1), Vector2i(-1,0), Vector2i(1,0)]
 const DIR_LABELS  = ["▲", "▼", "◄", "►"]
@@ -19,13 +21,14 @@ const BTN_SIZE    = Vector2(44, 44)
 const C_OK        = Color(0.9, 0.75, 0.2, 0.95)
 const C_NO        = Color(0.4, 0.4,  0.4, 0.5)
 const C_BOMB_BTN  = Color(1.0, 0.4,  0.1, 0.95)
+const C_SEL       = Color(0.2, 0.7,  1.0, 0.95)
 
 var upper_grid:   Node2D = null
 var lower_grid:   Node2D = null
 var turn_manager: Node   = null
 var carrier_ship: Node2D = null
-var enemy_if              = null   # is_hit(Vector2i)→bool, optional sink_ship_at(Vector2i)→bool
-var player_model          = null   # GridModel for own-ship bomb sinking
+var enemy_if              = null
+var player_model          = null
 
 var _drones:          Array  = []
 var _next_id:         int    = 0
@@ -40,10 +43,15 @@ var launch_pending:   bool = false
 var _carrier_ui_on:   bool = false
 
 var _ui_layer:    CanvasLayer  = null
-var _launch_btn:  Button       = null
+
+# Right-column controls (movement)
 var _move_btns:   Array[Button] = []
 var _bomb_btn:    Button        = null
 var _info_lbl:    Label         = null
+
+# Left-panel controls (drone selection + launch)
+var _drone_slot_btns:  Array[Button] = []
+var _drone_launch_btn: Button        = null
 
 # ─────────────────────────────────────────
 
@@ -60,15 +68,34 @@ func _build_ui() -> void:
 	_ui_layer = CanvasLayer.new()
 	get_parent().add_child(_ui_layer)
 
-	_launch_btn = _make_btn("🚁 Пустити дрон (3)", Vector2(140, 38), 12)
-	_launch_btn.modulate = Color(0.3, 0.9, 0.5)
-	_launch_btn.pressed.connect(_on_begin_launch)
-	_ui_layer.add_child(_launch_btn)
+	# ── Left panel: drone slots + launch ─────────────────────────
+	var panel_x = _panel_left()
+	var panel_y = upper_grid.global_position.y
+	var btn_w   = max(_panel_width() - 4.0, 40.0)
 
+	for i in range(MAX_DRONES):
+		var btn = _make_btn("---", Vector2(btn_w, 38), 11)
+		btn.modulate = C_NO
+		btn.disabled = true
+		var slot_idx = i
+		btn.pressed.connect(func(): _on_drone_slot_pressed(slot_idx))
+		btn.position = Vector2(panel_x, panel_y + 4.0 + i * 42.0)
+		btn.visible  = true
+		_ui_layer.add_child(btn)
+		_drone_slot_btns.append(btn)
+
+	_drone_launch_btn = _make_btn("🚁 Пустити (%d)" % MAX_DRONES,
+		Vector2(btn_w, 38), 11)
+	_drone_launch_btn.modulate = Color(0.3, 0.9, 0.5)
+	_drone_launch_btn.position = Vector2(panel_x, panel_y + 4.0 + MAX_DRONES * 42.0 + 4.0)
+	_drone_launch_btn.pressed.connect(_on_begin_launch)
+	_ui_layer.add_child(_drone_launch_btn)
+
+	# ── Right column: movement controls ──────────────────────────
 	for i in range(4):
 		var btn = _make_btn(DIR_LABELS[i], BTN_SIZE, 18)
-		var idx = i
-		btn.pressed.connect(func(): _move_selected(DIRS[idx]))
+		var di  = i
+		btn.pressed.connect(func(): _move_selected(DIRS[di]))
 		_ui_layer.add_child(btn)
 		_move_btns.append(btn)
 
@@ -82,17 +109,7 @@ func _build_ui() -> void:
 	_info_lbl.visible = false
 	_ui_layer.add_child(_info_lbl)
 
-	_hide_all()
-
-func _make_btn(txt: String, sz: Vector2, fsz: int) -> Button:
-	var b = Button.new()
-	b.text = txt
-	b.custom_minimum_size = sz
-	b.size = sz
-	b.add_theme_font_size_override("font_size", fsz)
-	b.visible = false
-	b.mouse_filter = Control.MOUSE_FILTER_STOP
-	return b
+	_hide_drone_controls()
 
 # ── Public API ────────────────────────────────────────────────
 
@@ -100,15 +117,16 @@ func can_launch() -> bool:
 	return carrier_ship != null and carrier_ship.is_placed \
 		and _drones_launched < MAX_DRONES
 
+func get_drone_panel_rect() -> Rect2:
+	return Rect2(_panel_left() - 4.0, upper_grid.global_position.y,
+		_panel_width() + 8.0, upper_grid.cell_size * 20.0)
+
 ## Called by CombatManager when carrier selected/deselected
 func set_carrier_ui_visible(v: bool) -> void:
 	_carrier_ui_on = v
-	if v:
-		_refresh_launch_btn()
-	else:
-		_launch_btn.visible = false
-		if not selected_drone:
-			_hide_all()
+	_refresh_drone_panel()
+	if not v and not selected_drone:
+		_hide_drone_controls()
 
 ## Called from CombatManager.handle_input for upper-grid clicks.
 ## Returns true if click was consumed (don't treat as shot).
@@ -116,21 +134,13 @@ func handle_upper_click(coord: Vector2i) -> bool:
 	if launch_pending:
 		launch_pending = false
 		_do_launch(coord)
-		_refresh_launch_btn()
 		return true
-	for d in _drones:
-		if d.pos == coord:
-			if selected_drone == d:
-				_deselect_drone()
-			else:
-				_select_drone(d)
-			return true
 	return false
 
 func cancel_launch() -> void:
 	if launch_pending:
 		launch_pending = false
-		_refresh_launch_btn()
+		_refresh_drone_panel()
 
 func is_drone_at(coord: Vector2i) -> bool:
 	for d in _drones:
@@ -139,7 +149,6 @@ func is_drone_at(coord: Vector2i) -> bool:
 
 ## Called at turn execution: ages drones, returns bomb data dict for network.
 func on_turn_executed() -> Dictionary:
-	# Check carrier alive
 	if carrier_ship and not carrier_ship.is_placed and _drones.size() > 0:
 		on_carrier_sunk()
 
@@ -155,19 +164,19 @@ func on_turn_executed() -> Dictionary:
 		_expire_drone(drone)
 
 	reveal_all()
+	_refresh_drone_panel()
 	_refresh_ui_after_age()
 	return data
 
-## Re-reveal all active drone areas (call at start of turn execution)
+## Re-reveal all active drone areas.
 func reveal_all() -> void:
 	if carrier_ship and not carrier_ship.is_placed:
 		if _drones.size() > 0: on_carrier_sunk()
 		return
 	for drone in _drones:
-		_reveal_area(drone.pos)
+		_reveal_area(drone)
 
 ## Check own ships on opponent bombs — sink any found.
-## Call at start of _on_execute_turn, before shots.
 func check_and_sink_own_ships_on_opp_bombs(ships: Array) -> void:
 	var to_sink = []
 	for ship in ships:
@@ -180,7 +189,6 @@ func check_and_sink_own_ships_on_opp_bombs(ships: Array) -> void:
 		_sink_own_ship_by_bomb(ship)
 
 ## Check opponent ships on own bombs — sink any found.
-## Call from NetworkOpponent after updating _opponent_ships.
 func apply_bomb_check_to_opp_ships(opp_ships: Dictionary, sink_fn: Callable) -> void:
 	for idx in opp_ships:
 		var entry = opp_ships[idx]
@@ -195,7 +203,6 @@ func apply_bomb_check_to_opp_ships(opp_ships: Dictionary, sink_fn: Callable) -> 
 				break
 
 ## Check own bombs vs single-player enemy (EnemySetup).
-## Call at start of _on_execute_turn in single-player mode.
 func check_and_sink_enemy_on_own_bombs() -> void:
 	if not enemy_if: return
 	for bomb_pos in _own_bombs.duplicate():
@@ -207,26 +214,26 @@ func check_and_sink_enemy_on_own_bombs() -> void:
 			_own_bombs.erase(bomb_pos)
 			upper_grid.set_cell(bomb_pos, 10)
 
-## Receive a bomb placed by opponent (display on lower_grid).
+## Receive a bomb placed by opponent — track for sinking check only, don't show visually.
 func receive_opp_bomb(pos: Vector2i) -> void:
 	if pos not in _opp_bombs:
 		_opp_bombs.append(pos)
-		lower_grid.set_cell(pos, 12)
 
 ## Carrier was sunk: destroy all drones (bombs persist).
 func on_carrier_sunk() -> void:
 	for drone in _drones.duplicate():
 		_expire_drone(drone)
 	_carrier_ui_on = false
-	_hide_all()
+	_hide_drone_controls()
+	_refresh_drone_panel()
 
 # ── Launch & lifecycle ────────────────────────────────────────
 
 func _on_begin_launch() -> void:
 	launch_pending = true
 	_deselect_drone()
-	_launch_btn.text    = "🚁 Клікніть на карті суперника"
-	_launch_btn.modulate = Color(1.0, 0.85, 0.1)
+	_drone_launch_btn.text    = "🚁 Клікніть на карті"
+	_drone_launch_btn.modulate = Color(1.0, 0.85, 0.1)
 
 func _do_launch(coord: Vector2i) -> void:
 	if not can_launch(): return
@@ -239,15 +246,18 @@ func _do_launch(coord: Vector2i) -> void:
 	_drones.append(drone)
 	_drones_launched += 1
 	upper_grid.set_cell(coord, 4)
-	_reveal_area(coord)
+	_reveal_area(drone)
 	_select_drone(drone)
+	_refresh_drone_panel()
 
 func _expire_drone(drone) -> void:
+	_clear_drone_revealed(drone)
 	_clear_drone_cell(drone.pos)
 	_drones.erase(drone)
 	if selected_drone == drone:
 		selected_drone = null
 		_hide_drone_controls()
+	_refresh_drone_panel()
 
 func _clear_drone_cell(pos: Vector2i) -> void:
 	upper_grid.set_cell(pos, 12 if pos in _own_bombs else 0)
@@ -257,10 +267,20 @@ func _clear_drone_cell(pos: Vector2i) -> void:
 func _select_drone(drone) -> void:
 	selected_drone = drone
 	_refresh_drone_controls()
+	_refresh_drone_panel()
 
 func _deselect_drone() -> void:
 	selected_drone = null
 	_hide_drone_controls()
+	_refresh_drone_panel()
+
+func _on_drone_slot_pressed(slot_idx: int) -> void:
+	if slot_idx >= _drones.size(): return
+	var drone = _drones[slot_idx]
+	if selected_drone == drone:
+		_deselect_drone()
+	else:
+		_select_drone(drone)
 
 # ── Movement ──────────────────────────────────────────────────
 
@@ -273,7 +293,7 @@ func _move_selected(dir: Vector2i) -> void:
 	_clear_drone_cell(selected_drone.pos)
 	selected_drone.pos = new_pos
 	upper_grid.set_cell(new_pos, 4)
-	_reveal_area(new_pos)
+	_reveal_area(selected_drone)
 	_refresh_drone_controls()
 
 # ── Bomb ──────────────────────────────────────────────────────
@@ -289,8 +309,11 @@ func _on_drop_bomb() -> void:
 
 # ── Reconnaissance ────────────────────────────────────────────
 
-func _reveal_area(center: Vector2i) -> void:
+## Clear a drone's previously revealed cells, then reveal new 3×3 around its pos.
+func _reveal_area(drone) -> void:
+	_clear_drone_revealed(drone)
 	if not enemy_if: return
+	var center = drone.pos
 	for dy in range(-1, 2):
 		for dx in range(-1, 2):
 			var cell = Vector2i(center.x + dx, center.y + dy)
@@ -300,6 +323,22 @@ func _reveal_area(center: Vector2i) -> void:
 			if st == 1: upper_grid.set_cell(cell, 0)   # clear stale intel
 			if enemy_if.call("is_hit", cell):
 				upper_grid.set_cell(cell, 1)
+				if cell not in drone.revealed_cells:
+					drone.revealed_cells.append(cell)
+
+## Clear all cells revealed by this drone (restore to 0 unless another drone still covers them).
+func _clear_drone_revealed(drone) -> void:
+	for cell in drone.revealed_cells:
+		if upper_grid.cell_state[cell.y][cell.x] != 1: continue
+		var covered := false
+		for other in _drones:
+			if other == drone: continue
+			if cell in other.revealed_cells:
+				covered = true
+				break
+		if not covered:
+			upper_grid.set_cell(cell, 0)
+	drone.revealed_cells.clear()
 
 # ── Own-ship bomb destruction ─────────────────────────────────
 
@@ -344,25 +383,31 @@ func _sink_own_ship_by_bomb(ship: Node2D) -> void:
 
 # ── UI ────────────────────────────────────────────────────────
 
-func _refresh_launch_btn() -> void:
-	if not _carrier_ui_on:
-		_launch_btn.visible = false
-		return
-	var remaining = MAX_DRONES - _drones_launched
-	_launch_btn.visible  = can_launch()
-	_launch_btn.text     = "🚁 Пустити дрон (%d)" % remaining
-	_launch_btn.modulate = Color(0.3, 0.9, 0.5) if can_launch() else C_NO
-	_launch_btn.position = _col_pos(0.0)
+func _refresh_drone_panel() -> void:
+	for i in range(MAX_DRONES):
+		var btn = _drone_slot_btns[i]
+		if i < _drones.size():
+			var drone = _drones[i]
+			btn.text     = "🚁 #%d  ⏳%d  💣%d" % [drone.id + 1, drone.turns_left, drone.bombs_left]
+			btn.disabled = false
+			btn.modulate = C_SEL if (selected_drone == drone) else C_OK
+		else:
+			btn.text     = "---"
+			btn.disabled = true
+			btn.modulate = C_NO
+
+	var can = _carrier_ui_on and can_launch()
+	_drone_launch_btn.visible = can
+	if can and not launch_pending:
+		_drone_launch_btn.text    = "🚁 Пустити (%d)" % (MAX_DRONES - _drones_launched)
+		_drone_launch_btn.modulate = Color(0.3, 0.9, 0.5)
 
 func _refresh_drone_controls() -> void:
 	if not selected_drone:
 		_hide_drone_controls()
-		_refresh_launch_btn()
 		return
 
 	var cy = 0.0
-	if _carrier_ui_on and can_launch():
-		cy = 46.0   # below launch button
 
 	_info_lbl.visible = true
 	_info_lbl.text    = "🚁 #%d  ⏳%d  💣%d" % [
@@ -390,24 +435,34 @@ func _refresh_drone_controls() -> void:
 	_bomb_btn.modulate = C_BOMB_BTN if can_bomb else C_NO
 	_bomb_btn.position = _col_pos(cy)
 
-	_refresh_launch_btn()
-
 func _refresh_ui_after_age() -> void:
 	if selected_drone:
 		_refresh_drone_controls()
-	else:
-		_refresh_launch_btn()
 
 func _hide_drone_controls() -> void:
 	for btn in _move_btns: btn.visible = false
 	_bomb_btn.visible = false
 	_info_lbl.visible = false
 
-func _hide_all() -> void:
-	_hide_drone_controls()
-	_launch_btn.visible = false
+# ── Positioning ───────────────────────────────────────────────
+
+func _panel_left() -> float:
+	return 4.0
+
+func _panel_width() -> float:
+	return max(upper_grid.global_position.x - 8.0, 40.0)
 
 func _col_pos(offset_y: float) -> Vector2:
 	var cs = upper_grid.cell_size
 	return Vector2(upper_grid.global_position.x + cs * 20.0 + 4.0,
 				   upper_grid.global_position.y + 4.0 + offset_y)
+
+func _make_btn(txt: String, sz: Vector2, fsz: int) -> Button:
+	var b = Button.new()
+	b.text = txt
+	b.custom_minimum_size = sz
+	b.size = sz
+	b.add_theme_font_size_override("font_size", fsz)
+	b.visible = false
+	b.mouse_filter = Control.MOUSE_FILTER_STOP
+	return b

@@ -129,6 +129,7 @@ func _build_ui() -> void:
 		_fleet_panel.set("all_ships", all_ships)
 		_fleet_panel.set("plan_ref",  plan)
 		_ui_layer.add_child(_fleet_panel)
+		_fleet_panel.ship_clicked.connect(_on_fleet_panel_ship_clicked)
 
 # ─────────────────────────────────────────
 #  Input з GameScene
@@ -147,26 +148,12 @@ func handle_input(gpos: Vector2) -> void:
 	if drone_manager and drone_manager.launch_pending:
 		drone_manager.cancel_launch()
 
-	# Тап на нижнє поле → вибір/зняття корабля для руху
-	_try_select_ship(gpos)
-
-func _try_select_ship(gpos: Vector2) -> void:
-	# Якщо ShipMover активний (стрілки показані) — не перехоплюємо
-	if ship_mover.get("selected_ship") != null:
-		return
-
-	for ship in all_ships:
-		if not ship.is_placed: continue
-		var ps  = ship.call("pixel_size") as Vector2
-		var loc = gpos - ship.global_position
-		if loc.x >= 0 and loc.y >= 0 and loc.x <= ps.x and loc.y <= ps.y:
-			if selected_ship == ship:
-				_deselect()
-			else:
-				_select(ship)
-			return
-
-	_deselect()
+func _on_fleet_panel_ship_clicked(ship: Node2D) -> void:
+	if _busy: return
+	if selected_ship == ship:
+		_deselect()
+	else:
+		_select(ship)
 
 func _select(ship: Node2D) -> void:
 	# Знімаємо попередній вибір
