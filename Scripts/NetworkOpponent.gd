@@ -30,6 +30,9 @@ func setup(p_upper: Node2D, p_lower: Node2D,
 	all_ships       = p_ships
 	network_manager.opponent_fleet_received.connect(_on_fleet_received)
 	network_manager.opponent_turn_received.connect(_on_turn_received)
+	# Race condition: opponent fleet may have arrived before we connected the signal
+	if network_manager.get("_opp_fleet_rcvd"):
+		_on_fleet_received(network_manager.get_opponent_fleet())
 
 # ── Флот ─────────────────────────────────────────────────────
 
