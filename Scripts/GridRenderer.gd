@@ -67,29 +67,33 @@ func _draw() -> void:
 
 func _draw_grid_lines(total: float) -> void:
 	var c = grid_color
+	var minor_color = Color(c.r, c.g, c.b, 0.18)
+	var major_color = Color(c.r, c.g, c.b, 0.78)
 
 	for y in range(GRID_SIZE + 1):
 		var start = Vector2(0,     y * cell_size)
 		var end   = Vector2(total, y * cell_size)
 		if y % 5 == 0:
 			# Акцентна — суцільна яскрава
-			draw_line(start, end, Color(c.r, c.g, c.b, 0.75), 1.0)
+			draw_line(start, end, major_color, 1.0)
 		else:
 			# Звичайна — пунктир
-			_draw_dashed(start, end, Color(c.r, c.g, c.b, 0.28), 0.5)
+			_draw_dashed(start, end, minor_color, 0.8)
 
 	for x in range(GRID_SIZE + 1):
 		var start = Vector2(x * cell_size, 0)
 		var end   = Vector2(x * cell_size, total)
 		if x % 5 == 0:
-			draw_line(start, end, Color(c.r, c.g, c.b, 0.75), 1.0)
+			draw_line(start, end, major_color, 1.0)
 		else:
-			_draw_dashed(start, end, Color(c.r, c.g, c.b, 0.28), 0.5)
+			_draw_dashed(start, end, minor_color, 0.8)
 
 ## Пунктирна лінія: штрих/проміжок залежить від розміру клітинки
 func _draw_dashed(from: Vector2, to: Vector2, color: Color, width: float) -> void:
-	var dash      = max(2.0, cell_size * 0.28)
-	var gap       = max(1.5, cell_size * 0.18)
+	# Дуже дрібний пунктир щоб чітко читалась саме 1×1 сітка,
+	# без візуального ефекту "кроку 2×2".
+	var dash      = max(1.0, cell_size * 0.10)
+	var gap       = max(1.0, cell_size * 0.10)
 	var dir       = (to - from).normalized()
 	var remaining = from.distance_to(to)
 	var cur       = from
