@@ -64,11 +64,12 @@ func _rpc_game_start(first_id: int) -> void:
 
 # ── Хід ──────────────────────────────────────────────────────
 
-func send_turn(shots: Array[Vector2i], ships: Array, noses: Array = []) -> void:
+func send_turn(shots: Array[Vector2i], ships: Array, noses: Array = [], drone_data: Dictionary = {}) -> void:
 	var data := {
 		"shots": shots.map(func(c): return [c.x, c.y]),
 		"moves": _serialize_fleet(ships),
 		"noses": noses.map(func(c): return [c.x, c.y]),
+		"new_bombs": drone_data.get("new_bombs", []),
 	}
 	rpc_id(_opponent_id, "_rpc_receive_turn", data)
 

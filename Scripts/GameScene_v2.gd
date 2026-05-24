@@ -193,6 +193,20 @@ func _on_setup_confirmed() -> void:
 
 		ship_mover.set("combat_manager", combat_manager)
 
+		# Drone manager (network mode)
+		var carrier_net: Node2D = null
+		for ship in ships_ref:
+			if ship.size == 5:
+				carrier_net = ship
+				break
+		var drone_manager_net = Node.new()
+		drone_manager_net.set_script(load("res://Scripts/DroneManager.gd"))
+		add_child(drone_manager_net)
+		drone_manager_net.call("setup", upper_grid, lower_grid, turn_manager,
+			carrier_net, network_opponent, grid_model)
+		combat_manager.set("drone_manager", drone_manager_net)
+		network_opponent.set("drone_manager", drone_manager_net)
+
 		var hud_btn = hud.get("_end_btn")
 		if hud_btn:
 			hud_btn.visible = false
@@ -233,6 +247,19 @@ func _on_setup_confirmed() -> void:
 		var hud_btn = hud.get("_end_btn")
 		if hud_btn:
 			hud_btn.visible = false
+
+		# Drone manager (single-player mode)
+		var carrier_sp: Node2D = null
+		for ship in ships_ref:
+			if ship.size == 5:
+				carrier_sp = ship
+				break
+		var drone_manager_sp = Node.new()
+		drone_manager_sp.set_script(load("res://Scripts/DroneManager.gd"))
+		add_child(drone_manager_sp)
+		drone_manager_sp.call("setup", upper_grid, lower_grid, turn_manager,
+			carrier_sp, enemy_setup, grid_model)
+		combat_manager.set("drone_manager", drone_manager_sp)
 
 		# EnemyAI — постріли ворога
 		enemy_ai = Node.new()
@@ -276,7 +303,10 @@ func _input(event: InputEvent) -> void:
 	combat_manager.call("handle_input", pos)
 
 func _click_on_ui(pos: Vector2) -> bool:
-	for layer in [ship_mover.get("_ui_layer"), combat_manager.get("_ui_layer")]:
+	var dm = combat_manager.get("drone_manager") if combat_manager else null
+	var layers = [ship_mover.get("_ui_layer"), combat_manager.get("_ui_layer"),
+		dm.get("_ui_layer") if dm else null]
+	for layer in layers:
 		if not layer:
 			continue
 		for child in layer.get_children():
@@ -295,7 +325,8 @@ func _on_turn_executed() -> void:
 		# Надсилаємо хід: постріли + поточні позиції всіх кораблів
 		var cm_ships: Array = combat_manager.get("all_ships")
 		var cm_noses: Array[Vector2i] = combat_manager.get("last_fired_noses")
-		network_manager.send_turn(_pending_shots, cm_ships, cm_noses)
+		var cm_drone_data: Dictionary = combat_manager.get("last_drone_data")
+		network_manager.send_turn(_pending_shots, cm_ships, cm_noses, cm_drone_data)
 		_pending_shots.clear()
 		_my_turn = false
 		lower_label.text = "МОЄ ПОЛЕ  [Хід суперника...]"
