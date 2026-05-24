@@ -141,8 +141,7 @@ func _on_turn_received(turn: Dictionary) -> void:
 	# Показуємо носи кораблів суперника на нашій прицільній карті
 	for nose_arr in (turn.get("noses", []) as Array):
 		var nose := Vector2i(nose_arr[0], nose_arr[1])
-		if upper_grid.cell_state[nose.y][nose.x] == 0:
-			upper_grid.set_cell(nose, 9)
+		upper_grid.set_cell(nose, 9)
 
 	_opponent_turn_ready = true
 	opponent_turn_applied.emit()

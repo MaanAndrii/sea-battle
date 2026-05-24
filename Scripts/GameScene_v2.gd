@@ -206,6 +206,7 @@ func _on_setup_confirmed() -> void:
 			carrier_net, network_opponent, grid_model)
 		combat_manager.set("drone_manager", drone_manager_net)
 		network_opponent.set("drone_manager", drone_manager_net)
+		drone_manager_net.call("set_actions_enabled", false)
 
 		var hud_btn = hud.get("_end_btn")
 		if hud_btn:
@@ -220,6 +221,7 @@ func _on_setup_confirmed() -> void:
 		if not network_manager.get("_game_started"):
 			await network_manager.both_ready
 		_my_turn = network_manager.my_turn_first
+		drone_manager_net.call("set_actions_enabled", _my_turn)
 
 		if not _my_turn:
 			# Гравець Б ходить другим — чекаємо першого ходу суперника
@@ -227,6 +229,7 @@ func _on_setup_confirmed() -> void:
 			if not network_opponent.get("_opponent_turn_ready"):
 				await network_opponent.opponent_turn_applied
 			_my_turn = true
+			drone_manager_net.call("set_actions_enabled", true)
 
 		lower_label.text = "МОЄ ПОЛЕ  [Фаза бою]"
 	else:
@@ -260,6 +263,7 @@ func _on_setup_confirmed() -> void:
 		drone_manager_sp.call("setup", upper_grid, lower_grid, turn_manager,
 			carrier_sp, enemy_setup, grid_model)
 		combat_manager.set("drone_manager", drone_manager_sp)
+		drone_manager_sp.call("set_actions_enabled", true)
 
 		# EnemyAI — постріли ворога
 		enemy_ai = Node.new()
@@ -342,10 +346,15 @@ func _on_turn_executed() -> void:
 		network_manager.send_turn(_pending_shots, cm_ships, cm_noses, cm_drone_data)
 		_pending_shots.clear()
 		_my_turn = false
+		var dm = combat_manager.get("drone_manager")
+		if dm:
+			dm.call("set_actions_enabled", false)
 		lower_label.text = "МОЄ ПОЛЕ  [Хід суперника...]"
 		# Чекаємо поки суперник надішле свій хід
 		await network_opponent.opponent_turn_applied
 		_my_turn = true
+		if dm:
+			dm.call("set_actions_enabled", true)
 		lower_label.text = "МОЄ ПОЛЕ  [Фаза бою]"
 		combat_manager.call("resume")
 	else:

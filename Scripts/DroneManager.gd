@@ -15,6 +15,7 @@ class DroneInfo:
 const MAX_DRONES  = 3
 const DRONE_TURNS = 2
 const DRONE_BOMBS = 2
+const LAUNCH_COST = 5
 const DIRS        = [Vector2i(0,-1), Vector2i(0,1), Vector2i(-1,0), Vector2i(1,0)]
 const DIR_LABELS  = ["▲", "▼", "◄", "►"]
 const BTN_SIZE    = Vector2(44, 44)
@@ -41,6 +42,7 @@ var _new_bombs_this_turn: Array[Vector2i] = []
 
 var launch_pending:   bool = false
 var _carrier_ui_on:   bool = false
+var _actions_enabled: bool = true
 
 var _ui_layer:    CanvasLayer  = null
 
@@ -128,9 +130,18 @@ func set_carrier_ui_visible(v: bool) -> void:
 	if not v and not selected_drone:
 		_hide_drone_controls()
 
+func set_actions_enabled(v: bool) -> void:
+	_actions_enabled = v
+	if not v:
+		launch_pending = false
+		_deselect_drone()
+	_refresh_drone_panel()
+
 ## Called from CombatManager.handle_input for upper-grid clicks.
 ## Returns true if click was consumed (don't treat as shot).
 func handle_upper_click(coord: Vector2i) -> bool:
+	if not _actions_enabled:
+		return false
 	if launch_pending:
 		launch_pending = false
 		_do_launch(coord)
@@ -230,6 +241,7 @@ func on_carrier_sunk() -> void:
 # ── Launch & lifecycle ────────────────────────────────────────
 
 func _on_begin_launch() -> void:
+	if not _actions_enabled: return
 	launch_pending = true
 	_deselect_drone()
 	_drone_launch_btn.text    = "🚁 Клікніть на карті"
@@ -239,6 +251,7 @@ func _do_launch(coord: Vector2i) -> void:
 	if not can_launch(): return
 	if not upper_grid.is_valid(coord): return
 	if is_drone_at(coord): return
+	if not turn_manager.spend(LAUNCH_COST): return
 	var drone    = DroneInfo.new()
 	drone.id     = _next_id
 	_next_id    += 1
@@ -266,15 +279,18 @@ func _clear_drone_cell(pos: Vector2i) -> void:
 
 func _select_drone(drone) -> void:
 	selected_drone = drone
+	_refresh_selected_drone_highlight()
 	_refresh_drone_controls()
 	_refresh_drone_panel()
 
 func _deselect_drone() -> void:
 	selected_drone = null
+	_refresh_selected_drone_highlight()
 	_hide_drone_controls()
 	_refresh_drone_panel()
 
 func _on_drone_slot_pressed(slot_idx: int) -> void:
+	if not _actions_enabled: return
 	if slot_idx >= _drones.size(): return
 	var drone = _drones[slot_idx]
 	if selected_drone == drone:
@@ -285,6 +301,7 @@ func _on_drone_slot_pressed(slot_idx: int) -> void:
 # ── Movement ──────────────────────────────────────────────────
 
 func _move_selected(dir: Vector2i) -> void:
+	if not _actions_enabled: return
 	if not selected_drone: return
 	var new_pos = selected_drone.pos + dir
 	if not upper_grid.is_valid(new_pos): return
@@ -293,12 +310,14 @@ func _move_selected(dir: Vector2i) -> void:
 	_clear_drone_cell(selected_drone.pos)
 	selected_drone.pos = new_pos
 	upper_grid.set_cell(new_pos, 4)
+	_refresh_selected_drone_highlight()
 	_reveal_area(selected_drone)
 	_refresh_drone_controls()
 
 # ── Bomb ──────────────────────────────────────────────────────
 
 func _on_drop_bomb() -> void:
+	if not _actions_enabled: return
 	if not selected_drone or selected_drone.bombs_left <= 0: return
 	var pos = selected_drone.pos
 	if pos in _own_bombs: return
@@ -397,6 +416,8 @@ func _refresh_drone_panel() -> void:
 			btn.modulate = C_NO
 
 	var can = _carrier_ui_on and can_launch()
+	if not _actions_enabled:
+		can = false
 	_drone_launch_btn.visible = can
 	if can and not launch_pending:
 		_drone_launch_btn.text    = "🚁 Пустити (%d)" % (MAX_DRONES - _drones_launched)
@@ -436,6 +457,7 @@ func _refresh_drone_controls() -> void:
 	_bomb_btn.position = _col_pos(cy)
 
 func _refresh_ui_after_age() -> void:
+	_refresh_selected_drone_highlight()
 	if selected_drone:
 		_refresh_drone_controls()
 
@@ -443,6 +465,19 @@ func _hide_drone_controls() -> void:
 	for btn in _move_btns: btn.visible = false
 	_bomb_btn.visible = false
 	_info_lbl.visible = false
+
+func _refresh_selected_drone_highlight() -> void:
+	if selected_drone:
+		var area: Array[Vector2i] = []
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				var c = Vector2i(selected_drone.pos.x + dx, selected_drone.pos.y + dy)
+				if upper_grid.is_valid(c):
+					area.append(c)
+		upper_grid.set_highlight(area)
+	else:
+		var empty: Array[Vector2i] = []
+		upper_grid.set_highlight(empty)
 
 # ── Positioning ───────────────────────────────────────────────
 
