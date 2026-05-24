@@ -77,7 +77,7 @@ func _build_ui() -> void:
 
 	# Статус угорі
 	_status_lbl = Label.new()
-	_status_lbl.position = Vector2(8, 4)
+	_status_lbl.position = Vector2(8, vp.y - 130)
 	_status_lbl.size     = Vector2(vp.x - 16, 22)
 	_status_lbl.add_theme_font_size_override("font_size", 12)
 	_status_lbl.add_theme_color_override("font_color", Color(0.8, 0.95, 1.0))
@@ -86,7 +86,7 @@ func _build_ui() -> void:
 
 	# Інфо про вибраний корабель
 	_info_lbl = Label.new()
-	_info_lbl.position = Vector2(8, vp.y - 100)
+	_info_lbl.position = Vector2(8, vp.y - 106)
 	_info_lbl.size     = Vector2(vp.x - 16, 22)
 	_info_lbl.add_theme_font_size_override("font_size", 12)
 	_info_lbl.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5))
@@ -159,9 +159,13 @@ func _on_fleet_panel_ship_clicked(ship: Node2D) -> void:
 func _select(ship: Node2D) -> void:
 	# Знімаємо попередній вибір
 	if selected_ship and selected_ship != ship:
+		selected_ship.set("is_selected", false)
+		selected_ship.queue_redraw()
 		ship_mover.call("_deselect")
 
 	selected_ship = ship
+	selected_ship.set("is_selected", true)
+	selected_ship.queue_redraw()
 	shots_left    = turn_manager.shots_for_size(ship.size) - _shots_used(ship)
 
 	# Активуємо ShipMover для руху
@@ -173,6 +177,9 @@ func _select(ship: Node2D) -> void:
 		drone_manager.set_carrier_ui_visible(true)
 
 func _deselect() -> void:
+	if selected_ship:
+		selected_ship.set("is_selected", false)
+		selected_ship.queue_redraw()
 	selected_ship = null
 	shots_left    = 0
 	ship_mover.call("_deselect")
