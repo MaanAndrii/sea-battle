@@ -6,6 +6,10 @@
 extends Node
 
 const ENERGY_PER_TURN = 12
+const CELL_MISS = 5
+const CELL_HIT = 6
+const CELL_WRECK = 10
+const CELL_WRECK_ZONE = 11
 
 var lower_grid:   Node2D = null   # поле гравця
 var player_model          = null   # GridModel гравця
@@ -25,13 +29,6 @@ func setup(p_lower: Node2D, p_model, p_ships: Array) -> void:
 # ── Виконати хід ворога ─────────────────────────────────────
 
 func execute_turn() -> void:
-	print("[EnemyAI] execute_turn: player_model=", player_model != null)
-	if player_model:
-		var count = 0
-		for y in range(20):
-			for x in range(20):
-				if player_model.grid[y][x] == 1: count += 1
-		print("[EnemyAI] клітинок кораблів: ", count)
 	var energy = ENERGY_PER_TURN
 	var shots_this_turn: Array[Vector2i] = []
 
@@ -62,12 +59,12 @@ func _resolve(coord: Vector2i) -> void:
 	if player_model.grid[coord.y][coord.x] == 1:
 		player_model.grid[coord.y][coord.x] = 0
 		player_model._rebuild_forbidden()
-		lower_grid.set_cell(coord, 6)
+		lower_grid.set_cell(coord, CELL_HIT)
 		_on_hit(coord)
 	else:
 		var existing = lower_grid.cell_state[coord.y][coord.x]
-		if existing != 10 and existing != 11:
-			lower_grid.set_cell(coord, 5)
+		if existing != CELL_WRECK and existing != CELL_WRECK_ZONE:
+			lower_grid.set_cell(coord, CELL_MISS)
 
 func _on_hit(coord: Vector2i) -> void:
 	for ship in all_ships:
@@ -100,18 +97,18 @@ func _check_sunk(ship: Node2D) -> void:
 		ship_cells.append(Vector2i(c.x, c.y))
 
 	for cv in ship_cells:
-		lower_grid.set_cell(cv, 10)
+		lower_grid.set_cell(cv, CELL_WRECK)
 
 	var adj_cells: Array[Vector2i] = []
 	for cv in ship_cells:
 		for dy in range(-1, 2):
-			for dx in range(-1, 2):
-				if dx == 0 and dy == 0: continue
-				var nb = Vector2i(cv.x + dx, cv.y + dy)
-				if lower_grid.is_valid(nb) and not ship_cells.has(nb) and not adj_cells.has(nb):
-					if lower_grid.cell_state[nb.y][nb.x] != 10:
-						lower_grid.set_cell(nb, 11)
-					adj_cells.append(nb)
+				for dx in range(-1, 2):
+					if dx == 0 and dy == 0: continue
+					var nb = Vector2i(cv.x + dx, cv.y + dy)
+					if lower_grid.is_valid(nb) and not ship_cells.has(nb) and not adj_cells.has(nb):
+						if lower_grid.cell_state[nb.y][nb.x] != CELL_WRECK:
+							lower_grid.set_cell(nb, CELL_WRECK_ZONE)
+						adj_cells.append(nb)
 
 	if player_model:
 		player_model.add_wreckage(ship_cells)
