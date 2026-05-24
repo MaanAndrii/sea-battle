@@ -4,6 +4,7 @@
 ## Потоплений корабель: всі секції = true → is_sunk()
 
 extends Node2D
+const SkinManager = preload("res://Scripts/SkinManager.gd")
 
 var ship_name:        String = ""
 var size:             int    = 1
@@ -149,7 +150,7 @@ func _draw() -> void:
 					C_HIT_INNER, false, 1.0)
 				_draw_section_x(r)
 			else:
-				draw_rect(r, C_BODY)
+				draw_rect(r, _body_color())
 
 	# Лінії між секціями
 	for i in range(1, size):
@@ -226,6 +227,11 @@ func _draw_stern(ps: Vector2) -> void:
 	match rotation_step:
 		0, 2: draw_line(sc + Vector2(0, -sz), sc + Vector2(0,  sz), C_STERN_LINE, lw)
 		1, 3: draw_line(sc + Vector2(-sz, 0), sc + Vector2(sz, 0),  C_STERN_LINE, lw)
+
+func _body_color() -> Color:
+	if SkinManager.current_skin() == SkinManager.SKIN_NEON:
+		return Color(0.35, 0.95, 1.0, 0.92)
+	return C_BODY
 
 # ─────────────────────────────────────────
 #  Координати ніс/корма

@@ -15,6 +15,7 @@ class DroneInfo:
 const MAX_DRONES  = 3
 const DRONE_TURNS = 2
 const DRONE_BOMBS = 2
+const LAUNCH_COST = 5
 const DIRS        = [Vector2i(0,-1), Vector2i(0,1), Vector2i(-1,0), Vector2i(1,0)]
 const DIR_LABELS  = ["▲", "▼", "◄", "►"]
 const BTN_SIZE    = Vector2(44, 44)
@@ -250,6 +251,7 @@ func _do_launch(coord: Vector2i) -> void:
 	if not can_launch(): return
 	if not upper_grid.is_valid(coord): return
 	if is_drone_at(coord): return
+	if not turn_manager.spend(LAUNCH_COST): return
 	var drone    = DroneInfo.new()
 	drone.id     = _next_id
 	_next_id    += 1
@@ -466,7 +468,13 @@ func _hide_drone_controls() -> void:
 
 func _refresh_selected_drone_highlight() -> void:
 	if selected_drone:
-		upper_grid.set_highlight([selected_drone.pos])
+		var area: Array[Vector2i] = []
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				var c = Vector2i(selected_drone.pos.x + dx, selected_drone.pos.y + dy)
+				if upper_grid.is_valid(c):
+					area.append(c)
+		upper_grid.set_highlight(area)
 	else:
 		var empty: Array[Vector2i] = []
 		upper_grid.set_highlight(empty)

@@ -15,6 +15,7 @@ var _ip_field:    LineEdit    = null
 var _host_btn:    Button      = null
 var _join_btn:    Button      = null
 var _solo_btn:    Button      = null
+var _skin_opt:    OptionButton = null
 
 func _ready() -> void:
 	_build_ui()
@@ -46,6 +47,12 @@ func _build_ui() -> void:
 	vbox.add_child(sub)
 
 	_add_separator(vbox)
+
+	_skin_opt = OptionButton.new()
+	_skin_opt.add_item("Classic")
+	_skin_opt.add_item("Neon")
+	_skin_opt.selected = 0
+	vbox.add_child(_skin_opt)
 
 	_host_btn = _make_btn("Хостувати (порт 7777)", Color(0.2, 0.85, 0.4))
 	_host_btn.pressed.connect(_on_host)
@@ -111,6 +118,7 @@ func _on_join() -> void:
 	_set_status("Підключення до %s:7777..." % ip)
 
 func _on_solo() -> void:
+	_apply_skin_choice()
 	get_tree().change_scene_to_file("res://GameScene.tscn")
 
 # ── NetworkManager/Transport lifecycle ───────────────────────
@@ -136,6 +144,7 @@ func _on_connection_failed() -> void:
 	_set_buttons_enabled(true)
 
 func _on_opponent_connected() -> void:
+	_apply_skin_choice()
 	_set_status("Суперник підключився! Переходимо до гри...")
 	# Невелика затримка щоб повідомлення відобразилось, потім переходимо
 	await get_tree().create_timer(0.5).timeout
@@ -153,3 +162,7 @@ func _set_buttons_enabled(v: bool) -> void:
 	_host_btn.disabled = not v
 	_join_btn.disabled = not v
 	_solo_btn.disabled = not v
+
+func _apply_skin_choice() -> void:
+	var skin_id = "classic" if _skin_opt.selected == 0 else "neon"
+	get_tree().root.set_meta("skin_id", skin_id)

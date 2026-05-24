@@ -3,6 +3,7 @@
 ## Звичайні лінії — пунктир, кожна 5-та — суцільна акцентна.
 
 extends Node2D
+const SkinManager = preload("res://Scripts/SkinManager.gd")
 
 @export var grid_color: Color = Color(0.2, 0.5, 0.9, 0.6)
 @export var bg_color:   Color = Color(0.04, 0.1, 0.22, 1.0)
@@ -67,8 +68,9 @@ func _draw() -> void:
 
 func _draw_grid_lines(total: float) -> void:
 	var c = grid_color
-	var minor_color = Color(c.r, c.g, c.b, 0.18)
-	var major_color = Color(c.r, c.g, c.b, 0.78)
+	var neon = SkinManager.current_skin() == SkinManager.SKIN_NEON
+	var minor_color = Color(c.r, c.g, c.b, 0.26 if neon else 0.18)
+	var major_color = Color(c.r, c.g, c.b, 0.95 if neon else 0.78)
 
 	for y in range(GRID_SIZE + 1):
 		var start = Vector2(0,     y * cell_size)
