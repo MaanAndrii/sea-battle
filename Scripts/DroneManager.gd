@@ -41,6 +41,7 @@ var _new_bombs_this_turn: Array[Vector2i] = []
 
 var launch_pending:   bool = false
 var _carrier_ui_on:   bool = false
+var _actions_enabled: bool = true
 
 var _ui_layer:    CanvasLayer  = null
 
@@ -128,9 +129,18 @@ func set_carrier_ui_visible(v: bool) -> void:
 	if not v and not selected_drone:
 		_hide_drone_controls()
 
+func set_actions_enabled(v: bool) -> void:
+	_actions_enabled = v
+	if not v:
+		launch_pending = false
+		_deselect_drone()
+	_refresh_drone_panel()
+
 ## Called from CombatManager.handle_input for upper-grid clicks.
 ## Returns true if click was consumed (don't treat as shot).
 func handle_upper_click(coord: Vector2i) -> bool:
+	if not _actions_enabled:
+		return false
 	if launch_pending:
 		launch_pending = false
 		_do_launch(coord)
@@ -230,6 +240,7 @@ func on_carrier_sunk() -> void:
 # ── Launch & lifecycle ────────────────────────────────────────
 
 func _on_begin_launch() -> void:
+	if not _actions_enabled: return
 	launch_pending = true
 	_deselect_drone()
 	_drone_launch_btn.text    = "🚁 Клікніть на карті"
@@ -277,6 +288,7 @@ func _deselect_drone() -> void:
 	_refresh_drone_panel()
 
 func _on_drone_slot_pressed(slot_idx: int) -> void:
+	if not _actions_enabled: return
 	if slot_idx >= _drones.size(): return
 	var drone = _drones[slot_idx]
 	if selected_drone == drone:
@@ -287,6 +299,7 @@ func _on_drone_slot_pressed(slot_idx: int) -> void:
 # ── Movement ──────────────────────────────────────────────────
 
 func _move_selected(dir: Vector2i) -> void:
+	if not _actions_enabled: return
 	if not selected_drone: return
 	var new_pos = selected_drone.pos + dir
 	if not upper_grid.is_valid(new_pos): return
@@ -302,6 +315,7 @@ func _move_selected(dir: Vector2i) -> void:
 # ── Bomb ──────────────────────────────────────────────────────
 
 func _on_drop_bomb() -> void:
+	if not _actions_enabled: return
 	if not selected_drone or selected_drone.bombs_left <= 0: return
 	var pos = selected_drone.pos
 	if pos in _own_bombs: return
@@ -400,6 +414,8 @@ func _refresh_drone_panel() -> void:
 			btn.modulate = C_NO
 
 	var can = _carrier_ui_on and can_launch()
+	if not _actions_enabled:
+		can = false
 	_drone_launch_btn.visible = can
 	if can and not launch_pending:
 		_drone_launch_btn.text    = "🚁 Пустити (%d)" % (MAX_DRONES - _drones_launched)
