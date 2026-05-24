@@ -41,13 +41,7 @@ var _fleet_panel: Control     = null
 
 const C_COMMIT = Color(0.2, 0.9, 0.4, 1.0)
 const C_UNDO   = Color(0.6, 0.6, 0.6, 0.9)
-const CELL_MISS = 5
-const CELL_HIT = 6
-const CELL_PLANNED_SHOT = 7
-const CELL_OLD_HIT = 8
-const CELL_NOSE_MARK = 9
-const CELL_WRECK = 10
-const CELL_WRECK_ZONE = 11
+const CellState = preload("res://Scripts/CellState.gd")
 
 # ─────────────────────────────────────────
 #  Ініціалізація
@@ -200,7 +194,7 @@ func _add_shot(coord: Vector2i) -> void:
 	var cv    = Vector2i(coord.x, coord.y)
 	# Блокуємо стрільбу по уламках
 	var cell_st = upper_grid.cell_state[coord.y][coord.x]
-	if cell_st == CELL_WRECK or cell_st == CELL_WRECK_ZONE:
+	if cell_st == CellState.WRECK or cell_st == CellState.WRECK_ZONE:
 		_set_status("⚠ Ця клітинка зайнята уламками!")
 		return
 	if cv in shots:
@@ -218,7 +212,7 @@ func _add_shot(coord: Vector2i) -> void:
 	shots.append(cv)
 	shots_left -= 1
 	# Маркер на верхньому полі
-	upper_grid.set_cell(coord, CELL_PLANNED_SHOT)
+	upper_grid.set_cell(coord, CellState.PLANNED_SHOT)
 	# Мітка на носі корабля
 	selected_ship.set("shoot_marked", true)
 	selected_ship.queue_redraw()
@@ -313,7 +307,7 @@ func resume() -> void:
 func _resolve_shot(coord: Vector2i):
 	# Не стріляємо по уламках (захист від переписування стану 10/11)
 	var existing = upper_grid.cell_state[coord.y][coord.x]
-	if existing == CELL_WRECK or existing == CELL_WRECK_ZONE:
+	if existing == CellState.WRECK or existing == CellState.WRECK_ZONE:
 		await get_tree().create_timer(0.1).timeout
 		return
 	var is_hit = false
@@ -326,8 +320,8 @@ func _resolve_shot(coord: Vector2i):
 	# mark_hit може виставити state 10 (уламки) якщо корабель потоплено —
 	# не перекриваємо його маркером влучання/промаху
 	var post = upper_grid.cell_state[coord.y][coord.x]
-	if post != CELL_WRECK and post != CELL_WRECK_ZONE:
-		upper_grid.set_cell(coord, CELL_HIT if is_hit else CELL_MISS)
+	if post != CellState.WRECK and post != CellState.WRECK_ZONE:
+		upper_grid.set_cell(coord, CellState.HIT if is_hit else CellState.MISS)
 	await get_tree().create_timer(0.1).timeout
 
 # ── Управління маркерами ──────────────────────────────────────
@@ -337,24 +331,24 @@ func _age_markers() -> void:
 	for y in range(20):
 		for x in range(20):
 			match upper_grid.cell_state[y][x]:
-				CELL_OLD_HIT: upper_grid.set_cell(Vector2i(x, y), 0)   # старе потьмяніле → зникає
-				CELL_HIT: upper_grid.set_cell(Vector2i(x, y), CELL_OLD_HIT)   # влучання → потьмяніти
-				CELL_NOSE_MARK: upper_grid.set_cell(Vector2i(x, y), 0)   # ніс минулого ходу → зникає
-				CELL_MISS: upper_grid.set_cell(Vector2i(x, y), 0)   # промах минулого ходу → зникає
+				CellState.OLD_HIT: upper_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)   # старе потьмяніле → зникає
+				CellState.HIT: upper_grid.set_cell(Vector2i(x, y), CellState.OLD_HIT)   # влучання → потьмяніти
+				CellState.NOSE_MARK: upper_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)   # ніс минулого ходу → зникає
+				CellState.MISS: upper_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)   # промах минулого ходу → зникає
 	# Нижнє поле: промахи та маркери влучань ворога старіють
 	for y in range(20):
 		for x in range(20):
 			match lower_grid.cell_state[y][x]:
-				CELL_MISS: lower_grid.set_cell(Vector2i(x, y), 0)   # промах → зникає
-				CELL_OLD_HIT: lower_grid.set_cell(Vector2i(x, y), 0)   # потьмяніле влучання → зникає
-				CELL_HIT: lower_grid.set_cell(Vector2i(x, y), CELL_OLD_HIT)   # влучання → потьмяніти
+				CellState.MISS: lower_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)   # промах → зникає
+				CellState.OLD_HIT: lower_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)   # потьмяніле влучання → зникає
+				CellState.HIT: lower_grid.set_cell(Vector2i(x, y), CellState.OLD_HIT)   # влучання → потьмяніти
 				# Стани 10, 11 (уламки) — ніколи не стираємо
 
 func _clear_misses() -> void:
 	for y in range(20):
 		for x in range(20):
-			if upper_grid.cell_state[y][x] == CELL_MISS:
-				upper_grid.set_cell(Vector2i(x, y), 0)
+			if upper_grid.cell_state[y][x] == CellState.MISS:
+				upper_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)
 
 # ─────────────────────────────────────────
 #  UI оновлення
