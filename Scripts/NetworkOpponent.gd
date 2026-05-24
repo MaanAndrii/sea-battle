@@ -72,6 +72,7 @@ func mark_hit(coord: Vector2i) -> void:
 				for d in hit_sec:
 					if not d: all_hit = false; break
 				if all_hit:
+					entry["marked_sunk"] = true
 					_sink_opponent_ship(entry)
 				return
 

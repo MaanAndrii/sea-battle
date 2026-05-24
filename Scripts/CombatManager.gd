@@ -269,10 +269,7 @@ func _on_execute_turn() -> void:
 			await _resolve_shot(c)
 			emit_signal("shot_fired", c)
 
-	# 3. Очищаємо промахи цього ходу (зникають одразу після виконання)
-	_clear_misses()
-
-	# 4. Скидаємо мітки кораблів
+	# 3. Скидаємо мітки кораблів
 	for entry in plan:
 		var s := entry["ship"] as Node2D
 		s.set("shoot_marked", false)
@@ -320,6 +317,7 @@ func _age_markers() -> void:
 				8: upper_grid.set_cell(Vector2i(x, y), 0)   # старе потьмяніле → зникає
 				6: upper_grid.set_cell(Vector2i(x, y), 8)   # влучання → потьмяніти
 				9: upper_grid.set_cell(Vector2i(x, y), 0)   # ніс минулого ходу → зникає
+				5: upper_grid.set_cell(Vector2i(x, y), 0)   # промах минулого ходу → зникає
 	# Нижнє поле: промахи та маркери влучань ворога старіють
 	for y in range(20):
 		for x in range(20):
