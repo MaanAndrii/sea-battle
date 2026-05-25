@@ -1,12 +1,13 @@
 ## GridModel.gd
 ## 0=вільно, 1=корабель, 2=заборонена зона, 3=уламки (блокує розміщення)
+## 4=промах (блокує переміщення кораблів, не зникає)
 ## ВАЖЛИВО: place_from_nose — основний метод розміщення
 ## cells[0] завжди = ніс корабля
 
 extends RefCounted
 
 const SIZE = 20
-enum CellState { EMPTY, SHIP, BLOCKED, WRECKAGE }
+enum CellState { EMPTY, SHIP, BLOCKED, WRECKAGE, MISS_BLOCK }
 var grid: Array = []
 
 func _init() -> void:
@@ -21,6 +22,14 @@ func add_wreckage(cells: Array) -> void:
 		var v = Vector2i(int(c.x), int(c.y))
 		if _in_bounds(v):
 			grid[v.y][v.x] = CellState.WRECKAGE
+
+## Позначає клітинку як "промах" — блокує рух кораблів постійно.
+func mark_miss(coord: Vector2i) -> void:
+	if not _in_bounds(coord): return
+	var g = grid[coord.y][coord.x]
+	# Можна позначити тільки порожню або заборонену клітинку
+	if g == CellState.EMPTY or g == CellState.BLOCKED:
+		grid[coord.y][coord.x] = CellState.MISS_BLOCK
 
 # ── Утиліта: всі клітинки від носа ─────────────────────────
 ## step=0(→): хвіст ліворуч  step=1(↓): хвіст вгору
@@ -49,12 +58,15 @@ func can_place_excluding_nose(nose: Vector2i, size: int, step: int,
 		own_set.append(Vector2i(int(c.x), int(c.y)))
 
 	var new_cells = cells_from_nose(nose, size, step)
-	# Перевірка меж і чужих кораблів
+	# Перевірка меж і зайнятих клітинок
 	for c in new_cells:
 		if not _in_bounds(c): return false
-		var v = Vector2i(c.x, c.y)
+		var v  = Vector2i(c.x, c.y)
 		var gv = grid[c.y][c.x]
-		if (gv == CellState.SHIP and not own_set.has(v)) or gv == CellState.WRECKAGE:
+		# Блокуємо: чужий корабель, уламки, клітинка-промах
+		if (gv == CellState.SHIP and not own_set.has(v)) \
+				or gv == CellState.WRECKAGE \
+				or gv == CellState.MISS_BLOCK:
 			return false
 	# Перевірка відступу від чужих кораблів
 	for c in new_cells:
@@ -71,10 +83,9 @@ func can_place_excluding_nose(nose: Vector2i, size: int, step: int,
 # ── Розміщення від носа ─────────────────────────────────────
 func place_from_nose(nose: Vector2i, size: int, step: int) -> Array[Vector2i]:
 	var cells = cells_from_nose(nose, size, step)
-	# Перевіряємо межі перед записом
 	for c in cells:
 		if not _in_bounds(c):
-			return []   # не розміщуємо якщо хоч одна клітинка за межами
+			return []
 	for c in cells: grid[c.y][c.x] = CellState.SHIP
 	for c in cells:
 		for dy in range(-1, 2):
@@ -111,7 +122,9 @@ func can_place_excluding(coord: Vector2i, size: int, horizontal: bool,
 	for c in new_cells:
 		if not _in_bounds(c): return false
 		var gv = grid[c.y][c.x]
-		if (gv == CellState.SHIP and not own_set.has(Vector2i(c.x, c.y))) or gv == CellState.WRECKAGE:
+		if (gv == CellState.SHIP and not own_set.has(Vector2i(c.x, c.y))) \
+				or gv == CellState.WRECKAGE \
+				or gv == CellState.MISS_BLOCK:
 			return false
 	for c in new_cells:
 		for dy in range(-1, 2):
@@ -143,6 +156,7 @@ func _in_bounds(c: Vector2i) -> bool:
 func _rebuild_forbidden() -> void:
 	for y in range(SIZE):
 		for x in range(SIZE):
+			# Скидаємо лише BLOCKED — MISS_BLOCK і WRECKAGE зберігаємо
 			if grid[y][x] == CellState.BLOCKED: grid[y][x] = CellState.EMPTY
 	for y in range(SIZE):
 		for x in range(SIZE):

@@ -339,18 +339,17 @@ func _age_markers() -> void:
 	for y in range(20):
 		for x in range(20):
 			match upper_grid.cell_state[y][x]:
-				CellState.OLD_HIT: upper_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)   # старе потьмяніле → зникає
-				CellState.HIT: upper_grid.set_cell(Vector2i(x, y), CellState.OLD_HIT)   # влучання → потьмяніти
-				CellState.NOSE_MARK: upper_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)   # ніс минулого ходу → зникає
-				CellState.MISS: upper_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)   # промах минулого ходу → зникає
-	# Нижнє поле: промахи та маркери влучань ворога старіють
+				CellState.OLD_HIT:   upper_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)  # старе → зникає
+				CellState.HIT:       upper_grid.set_cell(Vector2i(x, y), CellState.OLD_HIT)      # влучання → потьмяніти
+				CellState.NOSE_MARK: upper_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)   # ніс → зникає
+				# MISS залишається назавжди — не стираємо
+	# Нижнє поле: влучання ворога старіють; промахи залишаються
 	for y in range(20):
 		for x in range(20):
 			match lower_grid.cell_state[y][x]:
-				CellState.MISS: lower_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)   # промах → зникає
-				CellState.OLD_HIT: lower_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)   # потьмяніле влучання → зникає
-				CellState.HIT: lower_grid.set_cell(Vector2i(x, y), CellState.OLD_HIT)   # влучання → потьмяніти
-				# Стани 10, 11 (уламки) — ніколи не стираємо
+				CellState.OLD_HIT: lower_grid.set_cell(Vector2i(x, y), CellState.GRID_EMPTY)  # потьмяніле → зникає
+				CellState.HIT:     lower_grid.set_cell(Vector2i(x, y), CellState.OLD_HIT)      # влучання → потьмяніти
+				# MISS і WRECK (10, 11) — ніколи не стираємо
 
 func _clear_misses() -> void:
 	for y in range(20):

@@ -59,6 +59,9 @@ func _resolve(coord: Vector2i) -> void:
 		var existing = lower_grid.cell_state[coord.y][coord.x]
 		if existing != CellState.WRECK and existing != CellState.WRECK_ZONE:
 			lower_grid.set_cell(coord, CellState.MISS)
+			# Постійно блокуємо цю клітинку для переміщення гравця
+			if player_model and player_model.has_method("mark_miss"):
+				player_model.call("mark_miss", coord)
 
 func _on_hit(coord: Vector2i) -> void:
 	for ship in all_ships:

@@ -59,7 +59,7 @@ const N_SECTION_LINE = Color(0.0,  0.15,  0.12,  0.50)
 const N_NOSE_NORMAL  = Color(0.0,  1.0,   0.667, 1.0)   # #00ffaa
 const N_NOSE_SHOT    = Color(1.0,  0.243, 0.243, 1.0)   # #ff3e3e
 const N_STERN_LINE   = Color(0.0,  0.8,   0.55,  0.75)
-const N_GLOW_SEL     = Color(0.0,  1.0,   1.0,   1.0)   # #00ffff selection glow
+const N_GLOW_SEL     = Color(1.0,  0.85,  0.0,   1.0)   # #ffd900 gold selection glow
 const N_PARTICLE     = Color(0.0,  1.0,   0.667, 1.0)   # #00ffaa particle
 
 func setup(p_name: String, p_size: int, p_cell_size: float) -> void:
