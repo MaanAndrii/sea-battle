@@ -1,17 +1,15 @@
 ## ShipMover.gd — фаза руху кораблів
-## Стрілки, поворот CW/CCW, фантом, виконання з анімацією
+## Стрілки, поворот CW/CCW. Корабель рухається в реальному часі.
 
 extends Node2D
 const SkinManager = preload("res://Scripts/SkinManager.gd")
-
-signal move_committed
 
 # ── Залежності ───────────────────────────
 var grid_model            = null
 var grid_renderer: Node2D = null
 var turn_manager:  Node   = null
 var all_ships:     Array  = []
-var combat_manager: Node  = null   # встановлюється після створення
+var combat_manager: Node  = null
 
 # ── Стан ─────────────────────────────────
 var selected_ship: Node2D         = null
@@ -23,29 +21,22 @@ var _ui_layer:    CanvasLayer     = null
 var _arrow_btns:  Array[Button]   = []
 var _rotate_cw:   Button          = null
 var _rotate_ccw:  Button          = null
-var _commit_btn:  Button          = null
 var _cost_label:  Label           = null
 
 # ── Константи ────────────────────────────
 const DIRS        = [Vector2i(0,-1), Vector2i(0,1), Vector2i(-1,0), Vector2i(1,0)]
 const DIR_LABELS  = ["▲", "▼", "◄", "►"]
-const BTN_SIZE    = Vector2(52, 52)   # великі кнопки для пальців
+const BTN_SIZE    = Vector2(52, 52)
 const BTN_FONT    = 24
 
 const C_ARROW_OK  = Color(0.2,  0.85, 0.3,  0.95)
 const C_ARROW_NO  = Color(0.4,  0.4,  0.4,  0.5)
 const C_ROTATE    = Color(0.9,  0.75, 0.2,  0.95)
-const C_PHANTOM   = Color(0.4,  0.7,  1.0,  0.3)
-const C_PATH      = Color(0.3,  0.85, 1.0,  0.7)
-const C_COMMIT    = Color(0.2,  0.9,  0.4,  1.0)
 
 # Neon variants
-const N_ARROW_OK  = Color(0.0,  1.0,  0.667, 0.95)  # #00ffaa
+const N_ARROW_OK  = Color(0.0,  1.0,  0.667, 0.95)
 const N_ARROW_NO  = Color(0.25, 0.25, 0.30,  0.55)
-const N_ROTATE    = Color(1.0,  0.667, 0.0,  0.95)  # #ffaa00
-const N_PHANTOM   = Color(0.0,  1.0,  0.667, 0.22)  # #00ffaa ghost
-const N_PATH      = Color(0.0,  1.0,  1.0,  0.80)   # #00ffff trail
-const N_COMMIT    = Color(0.0,  1.0,  0.667, 1.0)   # #00ffaa
+const N_ROTATE    = Color(1.0,  0.667, 0.0,  0.95)
 
 # ─────────────────────────────────────────
 #  Ініціалізація
@@ -85,12 +76,6 @@ func _build_ui() -> void:
 	_cost_label.add_theme_font_size_override("font_size", 14)
 	_cost_label.visible = false
 	_ui_layer.add_child(_cost_label)
-
-	# Кнопка виконати хід
-	_commit_btn = _make_btn("✓ Виконати хід", Vector2(160, 48), 14)
-	_commit_btn.modulate = C_COMMIT
-	_commit_btn.pressed.connect(_on_commit)
-	_ui_layer.add_child(_commit_btn)
 
 	_hide_all_ui()
 
@@ -212,12 +197,6 @@ func _refresh_all_ui() -> void:
 		bwd_btn.position = Vector2(col_x, cy)
 	cy += BTN_SIZE.y + 4.0
 
-	# Кнопка завершення ходу
-	_commit_btn.modulate = N_COMMIT if neon else C_COMMIT
-	_commit_btn.visible  = true
-	_commit_btn.size     = Vector2(BTN_SIZE.x, 48)
-	_commit_btn.position = Vector2(col_x, cy)
-
 	queue_redraw()
 
 func _hide_all_ui() -> void:
@@ -225,7 +204,6 @@ func _hide_all_ui() -> void:
 	if _rotate_cw:   _rotate_cw.visible  = false
 	if _rotate_ccw:  _rotate_ccw.visible = false
 	if _cost_label:  _cost_label.visible = false
-	if _commit_btn:  _commit_btn.visible = false
 
 # ─────────────────────────────────────────
 #  Обробники кнопок
@@ -338,49 +316,13 @@ func _on_rotate(clockwise: bool) -> void:
 # ─────────────────────────────────────────
 
 func _on_commit() -> void:
-
-	if not selected_ship:
-		_deselect()
-		emit_signal("move_committed")
-		return
-
-	# Дозволяємо виконати хід навіть якщо path порожній (просто деселект)
-	# cells вже оновлені після кожного кроку — беремо напряму
-	var final_nose = Vector2i(selected_ship.cells[0].x, selected_ship.cells[0].y)
-
-	# GridModel вже оновлений (кожен крок оновлює його в _on_arrow)
-	# Але перевіряємо що cells відповідає final_nose
-	var expected = grid_model.cells_from_nose(final_nose, selected_ship.size, selected_ship.rotation_step)
-	if expected != selected_ship.cells:
-		grid_model.remove(selected_ship.cells)
-		var raw2 = grid_model.place_from_nose(final_nose, selected_ship.size, selected_ship.rotation_step)
-		var typed2: Array[Vector2i] = []
-		for c in raw2: typed2.append(Vector2i(c.x, c.y))
-		selected_ship.cells = typed2
-
-	# Цільова позиція у пікселях — рахуємо від ліво-верхньої клітинки, не від носа
-	var commit_cs = selected_ship.cell_size
-	var commit_top_left: Vector2i
-	match selected_ship.rotation_step:
-		0: commit_top_left = Vector2i(final_nose.x - selected_ship.size + 1, final_nose.y)
-		1: commit_top_left = Vector2i(final_nose.x, final_nose.y - selected_ship.size + 1)
-		_: commit_top_left = final_nose
-	var target_px = grid_renderer.grid_to_world(commit_top_left) \
-		- Vector2(commit_cs / 2.0, commit_cs / 2.0)
-
-	# Переміщуємо одразу (без анімації для надійності)
-	selected_ship.global_position = target_px
-
-	# Рух виконано — знімаємо мітку пострілу
-	selected_ship.set("shoot_marked", false)
-	selected_ship.queue_redraw()
-	# Spawn particle burst if neon and ship actually moved
-	if energy_spent > 0 and selected_ship.has_method("spawn_particles"):
-		selected_ship.call("spawn_particles")
-	# Оновлюємо рендер поля
-	_refresh_grid()
+	if selected_ship:
+		selected_ship.set("shoot_marked", false)
+		selected_ship.queue_redraw()
+		if energy_spent > 0 and selected_ship.has_method("spawn_particles"):
+			selected_ship.call("spawn_particles")
+		_refresh_grid()
 	_deselect()
-	emit_signal("move_committed")
 
 func _refresh_grid() -> void:
 	for y in range(20):
