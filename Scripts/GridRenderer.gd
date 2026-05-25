@@ -14,6 +14,7 @@ const GRID_SIZE: int = 20
 var cell_size: float = 16.0
 var cell_state: Array = []
 var highlighted_cells: Array[Vector2i] = []
+var alarm_cells: Array[Vector2i] = []   # drone contact zones (pulsing red)
 
 # ── Neon palette ──────────────────────────────────────────────
 const N_BG       := Color(0.039, 0.118, 0.165, 1.0)   # #0a1e2a
@@ -81,6 +82,10 @@ func _draw() -> void:
 	# 3. Підсвічування
 	for coord in highlighted_cells:
 		_draw_highlight(coord.x, coord.y)
+
+	# 3b. Alarm zones (drone contact detection)
+	for coord in alarm_cells:
+		_draw_alarm(coord.x, coord.y)
 
 	# 4. Лінії сітки
 	_draw_grid_lines(total)
@@ -348,6 +353,13 @@ func _draw_highlight(x: int, y: int) -> void:
 		draw_rect(rect, Color(1.0, 1.0, 0.5, alpha))
 		draw_rect(rect, Color(1.0, 1.0, 0.5, 0.6), false, 1.0)
 
+func _draw_alarm(x: int, y: int) -> void:
+	var rect  = _cell_rect(x, y)
+	var t     = Time.get_ticks_msec() * 0.001
+	var alpha = 0.07 + 0.07 * sin(t * TAU * 1.4)
+	draw_rect(rect, Color(1.0, 0.08, 0.08, alpha))
+	draw_rect(rect, Color(1.0, 0.12, 0.12, alpha * 2.2), false, 1.2)
+
 # ─────────────────────────────────────────
 #  Утиліти
 # ─────────────────────────────────────────
@@ -379,8 +391,12 @@ func set_highlight(cells: Array[Vector2i]) -> void:
 	highlighted_cells = cells
 	queue_redraw()
 
+func set_alarm_cells(cells: Array[Vector2i]) -> void:
+	alarm_cells = cells
+	queue_redraw()
+
 func _needs_animation() -> bool:
-	if highlighted_cells.size() > 0:
+	if highlighted_cells.size() > 0 or alarm_cells.size() > 0:
 		return true
 	if SkinManager.current_skin() != SkinManager.SKIN_NEON:
 		return false
