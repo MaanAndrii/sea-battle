@@ -128,6 +128,9 @@ func _on_turn_received(turn: Dictionary) -> void:
 	if drone_manager:
 		for bomb_arr in (turn.get("new_bombs", []) as Array):
 			drone_manager.receive_opp_bomb(Vector2i(bomb_arr[0], bomb_arr[1]))
+		# Immediately sink any of our ships that are on the newly received bombs
+		if all_ships.size() > 0:
+			drone_manager.check_and_sink_own_ships_on_opp_bombs(all_ships)
 
 	# Check opponent ships vs our own bombs
 	if drone_manager:
