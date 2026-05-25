@@ -2,6 +2,7 @@
 ## Стрілки, поворот CW/CCW, фантом, виконання з анімацією
 
 extends Node2D
+const SkinManager = preload("res://Scripts/SkinManager.gd")
 
 signal move_committed
 
@@ -31,12 +32,20 @@ const DIR_LABELS  = ["▲", "▼", "◄", "►"]
 const BTN_SIZE    = Vector2(52, 52)   # великі кнопки для пальців
 const BTN_FONT    = 24
 
-const C_ARROW_OK  = Color(0.2, 0.85, 0.3, 0.95)
-const C_ARROW_NO  = Color(0.4, 0.4,  0.4, 0.5)
-const C_ROTATE    = Color(0.9, 0.75, 0.2, 0.95)
-const C_PHANTOM   = Color(0.4, 0.7,  1.0, 0.3)
-const C_PATH      = Color(0.3, 0.85, 1.0, 0.7)
-const C_COMMIT    = Color(0.2, 0.9,  0.4, 1.0)
+const C_ARROW_OK  = Color(0.2,  0.85, 0.3,  0.95)
+const C_ARROW_NO  = Color(0.4,  0.4,  0.4,  0.5)
+const C_ROTATE    = Color(0.9,  0.75, 0.2,  0.95)
+const C_PHANTOM   = Color(0.4,  0.7,  1.0,  0.3)
+const C_PATH      = Color(0.3,  0.85, 1.0,  0.7)
+const C_COMMIT    = Color(0.2,  0.9,  0.4,  1.0)
+
+# Neon variants
+const N_ARROW_OK  = Color(0.0,  1.0,  0.667, 0.95)  # #00ffaa
+const N_ARROW_NO  = Color(0.25, 0.25, 0.30,  0.55)
+const N_ROTATE    = Color(1.0,  0.667, 0.0,  0.95)  # #ffaa00
+const N_PHANTOM   = Color(0.0,  1.0,  0.667, 0.22)  # #00ffaa ghost
+const N_PATH      = Color(0.0,  1.0,  1.0,  0.80)   # #00ffff trail
+const N_COMMIT    = Color(0.0,  1.0,  0.667, 1.0)   # #00ffaa
 
 # ─────────────────────────────────────────
 #  Ініціалізація
@@ -167,11 +176,16 @@ func _refresh_all_ui() -> void:
 		elif DIRS[i] == bwd_dir: bwd_btn = btn
 		else: btn.visible = false
 
+	var neon     = SkinManager.current_skin() == SkinManager.SKIN_NEON
+	var ok_col   = N_ARROW_OK if neon else C_ARROW_OK
+	var no_col   = N_ARROW_NO if neon else C_ARROW_NO
+	var rot_col  = N_ROTATE   if neon else C_ROTATE
+
 	if fwd_btn:
 		var can      = _can_move_dir(fwd_dir) and turn_manager.can_afford(energy_spent + mov_cost)
 		fwd_btn.visible  = true
 		fwd_btn.disabled = not can
-		fwd_btn.modulate = C_ARROW_OK if can else C_ARROW_NO
+		fwd_btn.modulate = ok_col if can else no_col
 		fwd_btn.position = Vector2(col_x, cy)
 	cy += BTN_SIZE.y + 4.0
 
@@ -183,8 +197,8 @@ func _refresh_all_ui() -> void:
 	_rotate_cw.visible   = true
 	_rotate_ccw.disabled = not can_rot
 	_rotate_cw.disabled  = not can_rot
-	_rotate_ccw.modulate = C_ROTATE if can_rot else C_ARROW_NO
-	_rotate_cw.modulate  = C_ROTATE if can_rot else C_ARROW_NO
+	_rotate_ccw.modulate = rot_col if can_rot else no_col
+	_rotate_cw.modulate  = rot_col if can_rot else no_col
 	_rotate_ccw.position = Vector2(col_x, cy)
 	cy += _rotate_ccw.size.y + 2.0
 	_rotate_cw.position  = Vector2(col_x, cy)
@@ -194,11 +208,12 @@ func _refresh_all_ui() -> void:
 		var can      = _can_move_dir(bwd_dir) and turn_manager.can_afford(energy_spent + mov_cost)
 		bwd_btn.visible  = true
 		bwd_btn.disabled = not can
-		bwd_btn.modulate = C_ARROW_OK if can else C_ARROW_NO
+		bwd_btn.modulate = ok_col if can else no_col
 		bwd_btn.position = Vector2(col_x, cy)
 	cy += BTN_SIZE.y + 4.0
 
 	# Кнопка завершення ходу
+	_commit_btn.modulate = N_COMMIT if neon else C_COMMIT
 	_commit_btn.visible  = true
 	_commit_btn.size     = Vector2(BTN_SIZE.x, 48)
 	_commit_btn.position = Vector2(col_x, cy)
@@ -369,6 +384,9 @@ func _on_commit() -> void:
 	# Рух виконано — знімаємо мітку пострілу
 	selected_ship.set("shoot_marked", false)
 	selected_ship.queue_redraw()
+	# Spawn particle burst if neon
+	if planned_path.size() > 0 and selected_ship.has_method("spawn_particles"):
+		selected_ship.call("spawn_particles")
 	# Оновлюємо рендер поля
 	_refresh_grid()
 	_deselect()
@@ -395,10 +413,12 @@ func _draw() -> void:
 
 	var cs = selected_ship.cell_size
 
+	var neon      = SkinManager.current_skin() == SkinManager.SKIN_NEON
+	var path_col  = N_PATH    if neon else C_PATH
+	var ghost_col = N_PHANTOM if neon else C_PHANTOM
+
 	# Лінія маршруту — показуємо пройдений шлях
-	# (planned_path — накопичені кроки, cells[0] — поточна позиція)
 	if planned_path.size() > 0:
-		# Відновлюємо початкову позицію (до руху)
 		var start_nose = Vector2i(selected_ship.cells[0].x, selected_ship.cells[0].y)
 		for i in range(planned_path.size() - 1, -1, -1):
 			start_nose = start_nose - planned_path[i]
@@ -407,8 +427,10 @@ func _draw() -> void:
 		for step in planned_path:
 			nose = nose + step
 			var nxt = grid_renderer.grid_to_world(nose)
-			draw_line(prev, nxt, C_PATH, 2.5)
-			draw_circle(nxt, 4.0, C_PATH)
+			if neon:
+				draw_line(prev, nxt, Color(path_col.r, path_col.g, path_col.b, 0.25), 5.0)
+			draw_line(prev, nxt, path_col, 2.0)
+			draw_circle(nxt, 3.5, path_col)
 			prev = nxt
 
 	# Фантом у фінальній позиції
@@ -417,9 +439,12 @@ func _draw() -> void:
 		var world = grid_renderer.grid_to_world(fn) - Vector2(cs / 2.0, cs / 2.0)
 		var pw    = cs * (selected_ship.size if selected_ship.is_horizontal else 1)
 		var ph    = cs * (1 if selected_ship.is_horizontal else selected_ship.size)
-		draw_rect(Rect2(world + Vector2(1,1), Vector2(pw-2, ph-2)), C_PHANTOM)
+		draw_rect(Rect2(world + Vector2(1,1), Vector2(pw-2, ph-2)), ghost_col)
 		draw_rect(Rect2(world + Vector2(1,1), Vector2(pw-2, ph-2)),
-			Color(C_PHANTOM.r, C_PHANTOM.g, C_PHANTOM.b, 0.9), false, 1.5)
+			Color(ghost_col.r, ghost_col.g, ghost_col.b, 0.85), false, 1.5)
+		if neon:
+			draw_rect(Rect2(world - Vector2(2,2), Vector2(pw+4, ph+4)),
+				Color(ghost_col.r, ghost_col.g, ghost_col.b, 0.12), false, 1.0)
 
 # ─────────────────────────────────────────
 #  Підсвічування
