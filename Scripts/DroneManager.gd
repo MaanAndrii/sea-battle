@@ -303,7 +303,9 @@ func _expire_drone(drone) -> void:
 	_refresh_drone_panel()
 
 func _clear_drone_cell(pos: Vector2i) -> void:
-	# Bomb at that exact cell persists; otherwise clear to empty
+	var st = upper_grid.cell_state[pos.y][pos.x]
+	if st == 10 or st == 11:  # wreck/wreck-zone must not be overwritten
+		return
 	upper_grid.set_cell(pos, 12 if pos in _own_bombs else 0)
 
 # ── Selection ─────────────────────────────────────────────────
