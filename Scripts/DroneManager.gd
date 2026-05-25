@@ -248,6 +248,17 @@ func receive_opp_bomb(pos: Vector2i) -> void:
 	if pos not in _opp_bombs:
 		_opp_bombs.append(pos)
 
+## Check if any of the ship's cells land on an active opponent bomb.
+## If so, immediately sink the ship and consume the bomb. Returns true if detonated.
+func check_and_detonate_on_ship(ship: Node2D) -> bool:
+	if not ship.is_placed: return false
+	for cell in ship.cells:
+		var v = Vector2i(int(cell.x), int(cell.y))
+		if v in _opp_bombs:
+			_sink_own_ship_by_bomb(ship)
+			return true
+	return false
+
 ## Carrier was sunk: destroy all drones (bombs persist).
 func on_carrier_sunk() -> void:
 	for drone in _drones.duplicate():
