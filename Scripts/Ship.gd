@@ -208,12 +208,10 @@ func _draw() -> void:
 	if is_selected and is_placed and not sunk:
 		if neon:
 			var glow_a = 0.65 + 0.35 * sin(Time.get_ticks_msec() * 0.001 * TAU * 1.1)
-			draw_rect(Rect2(-3, -3, ps.x+6, ps.y+6),
-				Color(N_GLOW_SEL.r, N_GLOW_SEL.g, N_GLOW_SEL.b, glow_a * 0.08), false, 1.0)
 			draw_rect(Rect2(-1, -1, ps.x+2, ps.y+2),
-				Color(N_GLOW_SEL.r, N_GLOW_SEL.g, N_GLOW_SEL.b, glow_a * 0.25), false, 1.0)
+				Color(N_GLOW_SEL.r, N_GLOW_SEL.g, N_GLOW_SEL.b, glow_a * 0.12), false, 1.0)
 			draw_rect(Rect2(0, 0, ps.x, ps.y),
-				Color(N_GLOW_SEL.r, N_GLOW_SEL.g, N_GLOW_SEL.b, glow_a * 0.70), false, 2.0)
+				Color(N_GLOW_SEL.r, N_GLOW_SEL.g, N_GLOW_SEL.b, glow_a * 0.75), false, 2.0)
 		else:
 			draw_rect(Rect2(m-1.5, m-1.5, ps.x-(m-1.5)*2, ps.y-(m-1.5)*2),
 				C_SELECTED_GLOW, false, 2.6)
