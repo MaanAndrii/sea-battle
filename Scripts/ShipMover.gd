@@ -182,7 +182,7 @@ func _refresh_all_ui() -> void:
 	var rot_col  = N_ROTATE   if neon else C_ROTATE
 
 	if fwd_btn:
-		var can      = _can_move_dir(fwd_dir) and turn_manager.can_afford(energy_spent + mov_cost)
+		var can      = _can_move_dir(fwd_dir) and turn_manager.can_afford(mov_cost)
 		fwd_btn.visible  = true
 		fwd_btn.disabled = not can
 		fwd_btn.modulate = ok_col if can else no_col
@@ -192,7 +192,7 @@ func _refresh_all_ui() -> void:
 	# Повороти
 	var rot_cost = turn_manager.rotation_cost(selected_ship.size,
 		selected_ship.get("damaged") == true)
-	var can_rot  = turn_manager.can_afford(energy_spent + rot_cost)
+	var can_rot  = turn_manager.can_afford(rot_cost)
 	_rotate_ccw.visible  = true
 	_rotate_cw.visible   = true
 	_rotate_ccw.disabled = not can_rot
@@ -205,7 +205,7 @@ func _refresh_all_ui() -> void:
 	cy += _rotate_cw.size.y + 4.0
 
 	if bwd_btn:
-		var can      = _can_move_dir(bwd_dir) and turn_manager.can_afford(energy_spent + mov_cost)
+		var can      = _can_move_dir(bwd_dir) and turn_manager.can_afford(mov_cost)
 		bwd_btn.visible  = true
 		bwd_btn.disabled = not can
 		bwd_btn.modulate = ok_col if can else no_col
@@ -275,7 +275,7 @@ func _on_arrow(dir_idx: int) -> void:
 	if selected_ship.get("shoot_marked") == true:
 		selected_ship.set("shoot_marked", false)
 		selected_ship.set("has_moved", true)
-	_update_path_highlight()
+	_clear_highlight()
 	_refresh_all_ui()
 	queue_redraw()
 
@@ -284,7 +284,7 @@ func _on_rotate(clockwise: bool) -> void:
 		return
 	var damaged = selected_ship.get("damaged") == true
 	var cost    = turn_manager.rotation_cost(selected_ship.size, damaged)
-	if not turn_manager.can_afford(energy_spent + cost):
+	if not turn_manager.can_afford(cost):
 		return
 
 	# Отримуємо нові клітинки після повороту навколо носа
