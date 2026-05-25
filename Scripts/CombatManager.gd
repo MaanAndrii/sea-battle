@@ -200,10 +200,13 @@ func _add_shot(coord: Vector2i) -> void:
 	var entry = _get_plan(selected_ship)
 	var shots = entry["shots"] as Array
 	var cv    = Vector2i(coord.x, coord.y)
-	# Блокуємо стрільбу по уламках
+	# Блокуємо стрільбу по вже обстріляних та зайнятих клітинках
 	var cell_st = upper_grid.cell_state[coord.y][coord.x]
 	if cell_st == CellState.WRECK or cell_st == CellState.WRECK_ZONE:
 		_set_status("⚠ Ця клітинка зайнята уламками!")
+		return
+	if cell_st == CellState.MISS or cell_st == CellState.HIT or cell_st == CellState.OLD_HIT:
+		_set_status("⚠ В цю клітинку вже стріляли!")
 		return
 	if cv in shots:
 		_set_status("⚠ В цю клітинку вже заплановано постріл")

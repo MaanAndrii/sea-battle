@@ -267,9 +267,6 @@ func _on_arrow(dir_idx: int) -> void:
 	# Оновлюємо рендер поля — стираємо стару позицію, малюємо нову
 	_refresh_grid()
 
-	# planned_path зберігаємо тільки для рендеру лінії маршруту
-	planned_path.append(dir)
-
 	if combat_manager:
 		combat_manager.call("register_step", selected_ship, dir)
 	if selected_ship.get("shoot_marked") == true:
@@ -374,18 +371,11 @@ func _on_commit() -> void:
 	# Переміщуємо одразу (без анімації для надійності)
 	selected_ship.global_position = target_px
 
-	# Анімація поверх (якщо є шлях)
-	if planned_path.size() > 0:
-		selected_ship.global_position = selected_ship.global_position  # скидаємо
-		var tween = create_tween()
-		tween.tween_property(selected_ship, "global_position", target_px, 0.3) \
-			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-
 	# Рух виконано — знімаємо мітку пострілу
 	selected_ship.set("shoot_marked", false)
 	selected_ship.queue_redraw()
-	# Spawn particle burst if neon
-	if planned_path.size() > 0 and selected_ship.has_method("spawn_particles"):
+	# Spawn particle burst if neon and ship actually moved
+	if energy_spent > 0 and selected_ship.has_method("spawn_particles"):
 		selected_ship.call("spawn_particles")
 	# Оновлюємо рендер поля
 	_refresh_grid()
@@ -408,43 +398,7 @@ func _refresh_grid() -> void:
 # ─────────────────────────────────────────
 
 func _draw() -> void:
-	if not selected_ship or selected_ship.cells.is_empty():
-		return
-
-	var cs = selected_ship.cell_size
-
-	var neon      = SkinManager.current_skin() == SkinManager.SKIN_NEON
-	var path_col  = N_PATH    if neon else C_PATH
-	var ghost_col = N_PHANTOM if neon else C_PHANTOM
-
-	# Лінія маршруту — показуємо пройдений шлях
-	if planned_path.size() > 0:
-		var start_nose = Vector2i(selected_ship.cells[0].x, selected_ship.cells[0].y)
-		for i in range(planned_path.size() - 1, -1, -1):
-			start_nose = start_nose - planned_path[i]
-		var nose = start_nose
-		var prev = grid_renderer.grid_to_world(nose)
-		for step in planned_path:
-			nose = nose + step
-			var nxt = grid_renderer.grid_to_world(nose)
-			if neon:
-				draw_line(prev, nxt, Color(path_col.r, path_col.g, path_col.b, 0.25), 5.0)
-			draw_line(prev, nxt, path_col, 2.0)
-			draw_circle(nxt, 3.5, path_col)
-			prev = nxt
-
-	# Фантом у фінальній позиції
-	if planned_path.size() > 0:
-		var fn    = Vector2i(selected_ship.cells[0].x, selected_ship.cells[0].y)
-		var world = grid_renderer.grid_to_world(fn) - Vector2(cs / 2.0, cs / 2.0)
-		var pw    = cs * (selected_ship.size if selected_ship.is_horizontal else 1)
-		var ph    = cs * (1 if selected_ship.is_horizontal else selected_ship.size)
-		draw_rect(Rect2(world + Vector2(1,1), Vector2(pw-2, ph-2)), ghost_col)
-		draw_rect(Rect2(world + Vector2(1,1), Vector2(pw-2, ph-2)),
-			Color(ghost_col.r, ghost_col.g, ghost_col.b, 0.85), false, 1.5)
-		if neon:
-			draw_rect(Rect2(world - Vector2(2,2), Vector2(pw+4, ph+4)),
-				Color(ghost_col.r, ghost_col.g, ghost_col.b, 0.12), false, 1.0)
+	pass  # Ship moves in real-time; no trail or ghost needed
 
 # ─────────────────────────────────────────
 #  Підсвічування
