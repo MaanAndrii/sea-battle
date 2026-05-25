@@ -156,6 +156,8 @@ func _apply_shot(coord: Vector2i) -> void:
 		var existing = lower_grid.cell_state[coord.y][coord.x]
 		if existing != 10 and existing != 11:
 			lower_grid.set_cell(coord, 5)
+			if player_model and player_model.has_method("mark_miss"):
+				player_model.call("mark_miss", coord)
 
 func _on_hit(coord: Vector2i) -> void:
 	for ship in all_ships:
