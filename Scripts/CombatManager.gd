@@ -421,6 +421,15 @@ func _start_round() -> void:
 	_init_plan()
 	_refresh_status()
 
-## No-op для сумісності з ShipMover
-func register_step(_ship: Node2D, _dir: Vector2i) -> void:
-	pass
+## Викликається після кожного кроку корабля — перевіряємо бомби
+func register_step(ship: Node2D, _dir: Vector2i) -> void:
+	if not drone_manager: return
+	if drone_manager.call("check_and_detonate_on_ship", ship):
+		ship_mover.call("_deselect")
+		if selected_ship == ship:
+			selected_ship = null
+			shots_left    = 0
+			if _info_lbl: _info_lbl.visible = false
+			if _undo_btn: _undo_btn.visible = false
+		_set_status("💥 Корабель знищено бомбою супротивника!")
+		_refresh_status()

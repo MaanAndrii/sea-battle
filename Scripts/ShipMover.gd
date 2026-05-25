@@ -247,6 +247,7 @@ func _on_arrow(dir_idx: int) -> void:
 
 	if combat_manager:
 		combat_manager.call("register_step", selected_ship, dir)
+	if not selected_ship: return  # ship was destroyed by a bomb mid-move
 	if selected_ship.get("shoot_marked") == true:
 		selected_ship.set("shoot_marked", false)
 		selected_ship.set("has_moved", true)
